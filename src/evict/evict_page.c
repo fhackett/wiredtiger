@@ -148,6 +148,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_PAGE *page;
+    int bucketset_level;
     uint8_t stats_flags;
     bool clean_page, closing, ebusy_only, inmem_split, tree_dead;
 
@@ -164,6 +165,32 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
 
     __wt_verbose_debug3(
       session, WT_VERB_EVICTION, "page %p (%s)", (void *)page, __wt_page_type_string(page->type));
+
+    bucketset_level = __wt_evict_get_bucketset_level(session, page);
+
+    /* Update the stats */
+    switch (bucketset_level) {
+    case WT_EVICT_LEVEL_WONT_NEED_LEAF:
+        WT_STAT_CONN_INCR(session, eviction_target_bucket_wont_need_leaf);
+        break;
+    case WT_EVICT_LEVEL_CLEAN_LEAF:
+        WT_STAT_CONN_INCR(session, eviction_target_bucket_clean_leaf);
+        break;
+    case WT_EVICT_LEVEL_WONT_NEED_INTERNAL:
+        WT_STAT_CONN_INCR(session, eviction_target_bucket_wont_need_internal);
+        break;
+    case WT_EVICT_LEVEL_CLEAN_INTERNAL:
+        WT_STAT_CONN_INCR(session, eviction_target_bucket_clean_internal);
+        break;
+    case WT_EVICT_LEVEL_DIRTY_LEAF:
+        WT_STAT_CONN_INCR(session, eviction_target_bucket_dirty_leaf);
+        break;
+    case WT_EVICT_LEVEL_DIRTY_INTERNAL:
+        WT_STAT_CONN_INCR(session, eviction_target_bucket_dirty_internal);
+        break;
+    default:
+        printf("Invalid bucket %d\n", bucketset_level);
+    }
 
     if (!WT_EVICT_PAGE_CLEARED(page))
         __wt_evict_remove(session, ref, false);

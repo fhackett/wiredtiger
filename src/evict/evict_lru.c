@@ -1116,30 +1116,6 @@ unlock_bucket_and_done:
             if (ref != NULL) {
                 TAILQ_REMOVE(&bucket->evict_queue, page, evict_data.evict_q);
                 page->evict_data.bucket = NULL;
-
-                /* Update the stats */
-                switch (i) {
-                case WT_EVICT_LEVEL_WONT_NEED_LEAF:
-                    WT_STAT_CONN_INCR(session, eviction_target_bucket_wont_need_leaf);
-                    break;
-                case WT_EVICT_LEVEL_CLEAN_LEAF:
-                    WT_STAT_CONN_INCR(session, eviction_target_bucket_clean_leaf);
-                    break;
-                case WT_EVICT_LEVEL_WONT_NEED_INTERNAL:
-                    WT_STAT_CONN_INCR(session, eviction_target_bucket_wont_need_internal);
-                    break;
-                case WT_EVICT_LEVEL_CLEAN_INTERNAL:
-                    WT_STAT_CONN_INCR(session, eviction_target_bucket_clean_internal);
-                    break;
-                case WT_EVICT_LEVEL_DIRTY_LEAF:
-                    WT_STAT_CONN_INCR(session, eviction_target_bucket_dirty_leaf);
-                    break;
-                case WT_EVICT_LEVEL_DIRTY_INTERNAL:
-                    WT_STAT_CONN_INCR(session, eviction_target_bucket_dirty_internal);
-                    break;
-                default:
-                    printf("Invalid bucket %u\n", i);
-                }
             }
             __wt_spin_unlock(session, &bucket->evict_queue_lock);
             if (ref != NULL)

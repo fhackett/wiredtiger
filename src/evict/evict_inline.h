@@ -119,6 +119,36 @@ __evict_destination_bucket(WT_SESSION_IMPL *session, uint64_t read_gen)
 }
 
 /*
+ * __wt_evict_get_bucketset_level --
+ *      Return the expected bucketset level for a page given its properties.
+ */
+static WT_INLINE int
+__wt_evict_get_bucketset_level(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+    if (__wt_atomic_load64(&page->evict_data.read_gen) == WT_READGEN_WONT_NEED) {
+        if (!WT_PAGE_IS_INTERNAL(page))
+            return WT_EVICT_LEVEL_WONT_NEED_LEAF;
+        else
+            return WT_EVICT_LEVEL_WONT_NEED_INTERNAL;
+    }
+    else if (!WT_PAGE_IS_INTERNAL(page) && !__wt_page_is_modified(page))
+        return WT_EVICT_LEVEL_CLEAN_LEAF;
+    else if (WT_PAGE_IS_INTERNAL(page) && !__wt_page_is_modified(page))
+        return WT_EVICT_LEVEL_CLEAN_INTERNAL;
+    else if (!WT_PAGE_IS_INTERNAL(page) && __wt_page_is_modified(page))
+        return WT_EVICT_LEVEL_DIRTY_LEAF;
+    else if (WT_PAGE_IS_INTERNAL(page) && __wt_page_is_modified(page))
+        return WT_EVICT_LEVEL_DIRTY_INTERNAL;
+
+     /*
+      * If we are here, we couldn't determine the bucketset level for a page
+      * and this must never happen.
+      */
+    WT_ASSERT(session, false);
+    return 0;
+}
+
+/*
  * __evict_page_get_bucketset --
  *     If the page is in the right bucketset, return true and set the bucketset return
  *     pointer to the current bucketset. If the page is in the wrong bucketset, return
@@ -153,29 +183,9 @@ __evict_page_get_bucketset(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT
     }
 
     /* Find the right bucketset level for the page */
-    if (__wt_atomic_load64(&page->evict_data.read_gen) == WT_READGEN_WONT_NEED) {
-        if (!WT_PAGE_IS_INTERNAL(page))
-            correct_bucketset_level = WT_EVICT_LEVEL_WONT_NEED_LEAF;
-        else
-            correct_bucketset_level = WT_EVICT_LEVEL_WONT_NEED_INTERNAL;
-    }
-    else if (!WT_PAGE_IS_INTERNAL(page) && !__wt_page_is_modified(page))
-        correct_bucketset_level = WT_EVICT_LEVEL_CLEAN_LEAF;
-    else if (WT_PAGE_IS_INTERNAL(page) && !__wt_page_is_modified(page))
-        correct_bucketset_level = WT_EVICT_LEVEL_CLEAN_INTERNAL;
-    else if (!WT_PAGE_IS_INTERNAL(page) && __wt_page_is_modified(page))
-        correct_bucketset_level = WT_EVICT_LEVEL_DIRTY_LEAF;
-    else if (WT_PAGE_IS_INTERNAL(page) && __wt_page_is_modified(page))
-        correct_bucketset_level = WT_EVICT_LEVEL_DIRTY_INTERNAL;
+    correct_bucketset_level = __wt_evict_get_bucketset_level(session, page);
 
     WT_ASSERT(session, correct_bucketset_level >= 0 && correct_bucketset_level < WT_EVICT_LEVELS);
-
-#if 0
-    printf("page is %s %s, read_gen = %" PRIu64 ", correct level is %d\n",
-           WT_PAGE_IS_INTERNAL(page)?"internal":"leaf",
-           __wt_page_is_modified(page)?"dirty":"clean",
-           page->evict_data.read_gen, correct_bucketset_level);
-#endif
     if (page->evict_data.bucket == NULL) {
         *bucketset = &evict_handle_data->evict_bucketset[correct_bucketset_level];
         return false;
