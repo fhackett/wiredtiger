@@ -510,7 +510,12 @@ struct __wt_connection_stats {
     int64_t cache_eviction_blocked_remove_hs_race_with_checkpoint;
     int64_t cache_eviction_blocked_no_progress;
     int64_t eviction_slow;
-    int64_t eviction_renumbered_buckets;
+    int64_t eviction_target_bucket_clean_internal;
+    int64_t eviction_target_bucket_clean_leaf;
+    int64_t eviction_target_bucket_dirty_internal;
+    int64_t eviction_target_bucket_dirty_leaf;
+    int64_t eviction_target_bucket_wont_need_internal;
+    int64_t eviction_target_bucket_wont_need_leaf;
     int64_t eviction_server_readgen;
     int64_t eviction_skip_pages_locked_or_evicted;
     int64_t eviction_skip_pages_flag;
@@ -528,7 +533,6 @@ struct __wt_connection_stats {
     int64_t eviction_target_strategy_both_clean_and_dirty;
     int64_t eviction_target_strategy_clean;
     int64_t eviction_target_strategy_dirty;
-    int64_t npos_evict_walk_max;
     int64_t eviction_active_workers;
     int64_t eviction_stable_state_workers;
     int64_t eviction_slept;
@@ -579,7 +583,6 @@ struct __wt_connection_stats {
     int64_t eviction_app_dirty_fail;
     int64_t cache_eviction_dirty;
     int64_t cache_eviction_blocked_multi_block_reconciliation_during_checkpoint;
-    int64_t npos_read_walk_max;
     int64_t eviction_enqueued_page;
     int64_t eviction_timed_out_ops;
     int64_t cache_eviction_blocked_overflow_keys;

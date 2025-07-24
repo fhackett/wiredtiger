@@ -281,8 +281,6 @@ conn_stats = [
     CacheStat('cache_read_app_time', 'application threads page read from disk to cache time (usecs)'),
     CacheStat('cache_write_app_count', 'application threads page write from cache to disk count'),
     CacheStat('cache_write_app_time', 'application threads page write from cache to disk time (usecs)'),
-    CacheStat('npos_evict_walk_max', 'eviction walk restored - had to walk this many pages', 'max_aggregate,no_scale'),
-    CacheStat('npos_read_walk_max', 'npos read - had to walk this many pages', 'max_aggregate,no_scale'),
 
     ##########################################
     # Eviction statistics
@@ -327,7 +325,6 @@ conn_stats = [
     EvictStat('eviction_skip_pages_last_running', 'eviction skips pages that are written with transactions greater than the last running'),
     EvictStat('eviction_skip_pages_locked_or_evicted', 'eviction skipped a page that was locked or evicted'),
     EvictStat('eviction_skip_pages_retry', 'eviction skips pages that previously failed eviction and likely will again'),
-    EvictStat('eviction_renumbered_buckets', 'eviction renumbered buckets'),
     EvictStat('eviction_skip_trees_eviction_disabled', 'eviction skips trees that disable eviction'),
     EvictStat('eviction_skip_trees_stick_in_cache', 'eviction skips trees that are configured to stick in cache'),
     EvictStat('eviction_skip_unwanted_pages', 'eviction skips pages that we do not want to evict'),
@@ -336,6 +333,12 @@ conn_stats = [
     EvictStat('eviction_slow', 'eviction making slow progress'),
     EvictStat('eviction_stable_state_workers', 'eviction worker thread stable number', 'no_clear'),
     EvictStat('eviction_state', 'eviction state', 'no_clear,no_scale'),
+    EvictStat('eviction_target_bucket_clean_internal', 'eviction selected pages clean internal bucket'),
+    EvictStat('eviction_target_bucket_clean_leaf', 'eviction selected pages from clean leaf bucket'),
+    EvictStat('eviction_target_bucket_dirty_internal', 'eviction selected pages from dirty internal bucket'),
+    EvictStat('eviction_target_bucket_dirty_leaf', 'eviction selected pages from dirty leaf bucket'),
+    EvictStat('eviction_target_bucket_wont_need_internal', 'eviction selected pages from won\'t need internal bucket 0'),
+    EvictStat('eviction_target_bucket_wont_need_leaf', 'eviction selected pages from won\'t need leaf bucket'),
     EvictStat('eviction_target_strategy_both_clean_and_dirty', 'eviction target strategy both clean and dirty pages'),
     EvictStat('eviction_target_strategy_clean', 'eviction target strategy only clean pages'),
     EvictStat('eviction_target_strategy_dirty', 'eviction target strategy only dirty pages'),

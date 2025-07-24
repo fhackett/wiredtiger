@@ -165,6 +165,9 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
     __wt_verbose_debug3(
       session, WT_VERB_EVICTION, "page %p (%s)", (void *)page, __wt_page_type_string(page->type));
 
+    if (!WT_EVICT_PAGE_CLEARED(page))
+        __wt_evict_remove(session, ref, false);
+
     tree_dead = F_ISSET(session->dhandle, WT_DHANDLE_DEAD);
     if (tree_dead)
         LF_SET(WT_EVICT_CALL_NO_SPLIT);
