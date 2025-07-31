@@ -41,10 +41,11 @@
 #define WT_EVICT_EXPECTED_CONTENTION WT_STAT_CONN_COUNTER_SLOTS
 
 /*
- * If the database fits entirely in cache, as few as 50 buckets is sufficient.
- * In a degenerate case where all we do is evict, 5000 buckets is about right to avoid contention.
+ * 400 was an experimentally measured sweet spot for YCSB-C with 130GB database
+ * and 40GB cache with 196GB system RAM, 20 workload threads and one eviction thread.
+ * TODO: understand how to set this parameter based on the cache size and the number of threads.
  */
-#define WT_EVICT_NUM_BUCKETS (200 * WT_EVICT_EXPECTED_CONTENTION)
+#define WT_EVICT_NUM_BUCKETS (400 * WT_EVICT_EXPECTED_CONTENTION)
 
 #define WT_EVICT_LEVEL_WONT_NEED_LEAF 0
 #define WT_EVICT_LEVEL_CLEAN_LEAF 1
