@@ -13,3 +13,8 @@ create_test_executable(model_verify_debug_log
     LIBS wiredtiger_model wiredtiger_model_test_common
     CXX NO_TEST_UTIL
 )
+create_test_executable(model_tracelink
+    SOURCES tracelink/main.cpp
+    LIBS wiredtiger_model_test_common
+    CXX NO_TEST_UTIL
+)
