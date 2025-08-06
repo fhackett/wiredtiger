@@ -1,3 +1,4 @@
+#include "antithesis_instrumentation.h"
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -23,7 +24,7 @@ struct NoCopy {
     NoCopy& operator=(const NoCopy&) = delete;
 };
 
-void errorCheck(int ret) {
+static void errorCheck(int ret) {
     if (ret != 0) {
         std::ostringstream out;
         out << "WiredTiger error code " << ret;

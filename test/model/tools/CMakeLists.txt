@@ -15,6 +15,13 @@ create_test_executable(model_verify_debug_log
 )
 create_test_executable(model_tracelink
     SOURCES tracelink/main.cpp
-    LIBS wiredtiger_model_test_common
+    LIBS wiredtiger_static
     CXX NO_TEST_UTIL
+)
+
+target_compile_options(model_tracelink
+    PRIVATE -fsanitize-coverage=trace-pc-guard -g
+)
+target_link_options(model_tracelink
+    PRIVATE -Wl,--build-id
 )

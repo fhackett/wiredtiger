@@ -3,8 +3,10 @@
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <initializer_list>
 #include <limits>
+#include <memory>
 #include <msgpack/v3/object_decl.hpp>
 #include <sstream>
 #include <vector>
@@ -108,10 +110,15 @@ struct RunnerDefns<_Self, _WorkloadContext, std::variant<Operations...>> {
     {}
 
     RunnerDefns(const Self&) = delete;
-    RunnerDefns(Self&&) = default;
+    RunnerDefns(Self&&) = delete;
 
+    #ifdef TRACELINK_USE_RANDOM_DEVICE
+    using rand_tp = std::random_device;
+    rand_tp rand{"/dev/urandom"};
+    #else
     using rand_tp = std::mt19937;
-    rand_tp rand;
+    rand_tp rand{};
+    #endif
 
     void operator()() {
         using OpFun = void(Self::*)();
@@ -181,8 +188,10 @@ private:
         Operation result = self().perform_operation(Tag<Operation>{});
         auto op_end = w.get_timestamp_now() - w.init_timestamp;
 
-        assert(op_end < std::numeric_limits<int32_t>::max());
-        assert(op_start < std::numeric_limits<int32_t>::max());
+        if (op_start >= std::numeric_limits<int32_t>::max())
+            throw tracelink::UnsupportedException{};
+        if (op_end >= std::numeric_limits<int32_t>::max())
+            throw tracelink::UnsupportedException{};
 
         bool should_succeed = !result._did_abort;
 
@@ -214,12 +223,14 @@ struct WorkloadContext {
     }
 
     void run() {
+        // To avoid ever copying or moving runners, explicitly manage them with unique_ptr.
+        // The thread can hold a reference to each worker, and everything will be cleaned up
+        // in order on exit.
+        std::vector<std::unique_ptr<typename _Self::RunnerDefns>> runners;
         std::vector<std::thread> threads;
         for(std::size_t i = 0; i < thread_count; ++i) {
-            threads.push_back(std::thread(typename _Self::RunnerDefns{{
-                self(),
-                i
-            }}));
+            runners.emplace_back(new typename _Self::RunnerDefns{{self(), i}});
+            threads.emplace_back(std::thread(std::ref(*runners[i])));
         }
         for(auto& thread : threads) {
             thread.join();
