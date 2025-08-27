@@ -16,3 +16,5 @@ threads=((count=20,reads=1))
 max_latency=1000
 sample_interval=5
 sample_rate=1
+
+verbose=2

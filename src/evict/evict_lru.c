@@ -1041,6 +1041,12 @@ __evict_get_ref(
 
     for (i = 0; i <= max_level; i++) {
         bucketset = WT_DHANDLE_TO_BUCKETSET(dhandle, i);
+/*
+        if (i == WT_EVICT_LEVEL_WONT_NEED_LEAF || i == WT_EVICT_LEVEL_WONT_NEED_INTERNAL)
+            num_buckets = 40;
+        else
+            num_buckets = WT_EVICT_NUM_BUCKETS;
+*/
         for (j = __wt_atomic_load32(&bucketset->bucket_last_considered) % WT_EVICT_NUM_BUCKETS, iter = 0;
              iter++ < WT_EVICT_NUM_BUCKETS; j = (j+1) % WT_EVICT_NUM_BUCKETS) {
 

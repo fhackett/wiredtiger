@@ -9,3 +9,4 @@ threads=((count=8,read=1))
 run_time=120
 report_interval=5
 table_count=4
+verbose=2

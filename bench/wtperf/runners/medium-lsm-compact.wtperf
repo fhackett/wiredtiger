@@ -7,3 +7,4 @@ compact=true
 threads=((count=16,read=1))
 run_time=120
 report_interval=5
+verbose=2

@@ -9,3 +9,4 @@ run_time=1200
 populate_threads=1
 sample_interval=10
 threads=((count=16,reads=1))
+verbose=2
