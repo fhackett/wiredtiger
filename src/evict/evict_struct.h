@@ -46,8 +46,8 @@
  * and 40GB cache with 196GB system RAM, 20 workload threads and one eviction thread.
  * TODO: understand how to set this parameter based on the cache size and the number of threads.
  */
-//#define WT_EVICT_NUM_BUCKETS (400 * WT_EVICT_EXPECTED_CONTENTION)
-#define WT_EVICT_NUM_BUCKETS 14
+#define WT_EVICT_NUM_BUCKETS (400 * WT_EVICT_EXPECTED_CONTENTION)
+//#define WT_EVICT_NUM_BUCKETS 14
 
 #define WT_EVICT_LEVEL_WONT_NEED_LEAF 0
 #define WT_EVICT_LEVEL_CLEAN_LEAF 1
