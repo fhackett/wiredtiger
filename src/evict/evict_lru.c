@@ -1050,6 +1050,9 @@ __evict_get_ref(
         for (j = __wt_atomic_load32(&bucketset->bucket_last_considered) % WT_EVICT_NUM_BUCKETS, iter = 0;
              iter++ < WT_EVICT_NUM_BUCKETS; j = (j+1) % WT_EVICT_NUM_BUCKETS) {
 
+//        for (j = __wt_random(&session->rnd) % WT_EVICT_NUM_BUCKETS, iter = 0;
+//             iter++ < WT_EVICT_NUM_BUCKETS; j = (j+1) % WT_EVICT_NUM_BUCKETS) {
+
             bucket = &bucketset->buckets[j];
             if (__wt_spin_trylock(session, &bucket->evict_queue_lock) == EBUSY)
                 continue;

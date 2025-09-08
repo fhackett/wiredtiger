@@ -102,25 +102,16 @@ __evict_destination_bucket(WT_SESSION_IMPL *session, uint64_t read_gen)
     (void)read_gen;
     return (uint64_t)(time(NULL) ^ (unsigned)session->id) % WT_EVICT_NUM_BUCKETS;
 #else
-    uint64_t contention_adjusted_bucket;
-
     /*
      * If this is a page we won't need, it goes into a distinct bucketset. In that bucketset
      * all pages have the same read generation, so we place into a bucket that correlates with
      * the session ID to avoid lock contention.
      */
-    if (read_gen == WT_READGEN_WONT_NEED || read_gen == WT_READGEN_EVICT_SOON) {
-        contention_adjusted_bucket = (uint64_t)((unsigned)session->id) % WT_EVICT_NUM_BUCKETS;
-//        printf("0:  t %u   b %" PRIu64 "\n", (unsigned)session->id, contention_adjusted_bucket);
-        return contention_adjusted_bucket;
-    }
-
-    contention_adjusted_bucket =
-        (__evict_base_bucket(read_gen) + session->id % WT_EVICT_EXPECTED_CONTENTION)
-        % WT_EVICT_NUM_BUCKETS;
-
-//    printf("1:  t %d   b %" PRIu64 "\n", (int)session->id, contention_adjusted_bucket);
-    return contention_adjusted_bucket;
+    if (read_gen == WT_READGEN_WONT_NEED || read_gen == WT_READGEN_EVICT_SOON)
+        return (uint64_t)(__wt_random(&session->rnd)) % WT_EVICT_NUM_BUCKETS;
+    else
+        return (__evict_base_bucket(read_gen) + session->id % WT_EVICT_EXPECTED_CONTENTION)
+            % WT_EVICT_NUM_BUCKETS;
 #endif
 }
 
@@ -132,6 +123,7 @@ static WT_INLINE int
 __wt_evict_get_bucketset_level(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     uint64_t read_gen;
+
     if ((read_gen = __wt_atomic_load64(&page->evict_data.read_gen)) == WT_READGEN_WONT_NEED ||
         read_gen == WT_READGEN_EVICT_SOON) {
         if (!WT_PAGE_IS_INTERNAL(page))
