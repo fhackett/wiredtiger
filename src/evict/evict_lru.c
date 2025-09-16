@@ -995,7 +995,7 @@ __evict_get_ref(
     WT_PAGE *page;
     WT_REF *ref;
     WT_REF_STATE previous_state;
-    uint32_t i, iter, j, max_level;
+    uint32_t i, iter, j, max_level, total_iter;
 
     *btreep = NULL;
     bucketset = NULL;
@@ -1005,6 +1005,7 @@ __evict_get_ref(
     iter = 0;
     max_level = 0;
     previous_state = 0;
+    total_iter = 0;
     /*
      * It is polite to initialize output variables, but it isn't safe for callers to use the
      * previous state if we don't return a locked ref.
@@ -1041,18 +1042,18 @@ __evict_get_ref(
 
     for (i = 0; i <= max_level; i++) {
         bucketset = WT_DHANDLE_TO_BUCKETSET(dhandle, i);
-/*
-        if (i == WT_EVICT_LEVEL_WONT_NEED_LEAF || i == WT_EVICT_LEVEL_WONT_NEED_INTERNAL)
-            num_buckets = 40;
-        else
-            num_buckets = WT_EVICT_NUM_BUCKETS;
-*/
+#if 0
+        if (bucketset->bucketset_num_items < WT_EVICT_EXPECTED_CONTENTION) {
+            printf("Skipping %d level , %" PRIu64 " items\n", (int)i, bucketset->bucketset_num_items);
+            continue;
+        }
+#endif
+        //printf("%d, %" PRIu64 "\n", (int)i, bucketset->bucketset_num_items);
+
         for (j = __wt_atomic_load32(&bucketset->bucket_last_considered) % WT_EVICT_NUM_BUCKETS, iter = 0;
              iter++ < WT_EVICT_NUM_BUCKETS; j = (j+1) % WT_EVICT_NUM_BUCKETS) {
 
-//        for (j = __wt_random(&session->rnd) % WT_EVICT_NUM_BUCKETS, iter = 0;
-//             iter++ < WT_EVICT_NUM_BUCKETS; j = (j+1) % WT_EVICT_NUM_BUCKETS) {
-
+            total_iter++;
             bucket = &bucketset->buckets[j];
             if (__wt_spin_trylock(session, &bucket->evict_queue_lock) == EBUSY)
                 continue;
@@ -1132,6 +1133,7 @@ unlock_bucket_and_done:
         }
     }
 done:
+    //printf("iter: %" PRIu32 ", reached level %d, %s\n", total_iter, (int)i, ref==NULL?"not found":"found");
     if (ref != NULL) {
         *btreep = ref->page->evict_data.dhandle->handle;
         *previous_statep = previous_state;
@@ -1140,8 +1142,6 @@ done:
          * Increment the busy count in the btree handle to prevent it from being closed under us.
          */
         (void)__wt_atomic_addv32(&((*btreep)->evict_data.evict_busy), 1);
-//        if (i == 1)
-//            printf("read_gen = %d, bucket = %d\n", (int)ref->page->evict_data.read_gen, (int) j);
     } else
         WT_STAT_CONN_INCR(session, eviction_get_ref_empty);
 
@@ -1681,6 +1681,7 @@ __wt_evict_init_handle_data(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
 void
 __wt_evict_remove(WT_SESSION_IMPL *session, WT_REF *ref, bool destroying)
 {
+    //WT_EVICT_BUCKETSET *bucketset;
     WT_PAGE *page;
     WT_REF_STATE previous_state;
     bool must_unlock_ref;
@@ -1724,7 +1725,12 @@ __wt_evict_remove(WT_SESSION_IMPL *session, WT_REF *ref, bool destroying)
 #endif
         __wt_spin_unlock(session, &page->evict_data.bucket->evict_queue_lock);
 
+#if 0
+        bucketset =  WT_BUCKET_TO_BUCKETSET(page->evict_data.bucket);
+        __wt_atomic_subv64(&bucketset->bucketset_num_items, 1);
+#endif
         page->evict_data.bucket = NULL;
+
         if (destroying)
             page->evict_data.destroying = true; /* sticky flag, once set can't unset */
     }
@@ -1867,19 +1873,12 @@ __wt_evict_enqueue_page(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_RE
     dst_bucket = __evict_destination_bucket(session, read_gen);
     bucket = &bucketset->buckets[dst_bucket];
 
-#if 0
-    if (times++ %10000 == 0)
-        if (!WT_PAGE_IS_INTERNAL(page) && read_gen != WT_READGEN_WONT_NEED) {
-            printf("ENQ %d, %d, \n", (int)dst_bucket, (int)read_gen);
-        }
-#endif
-
     __wt_spin_lock(session, &bucket->evict_queue_lock);
     TAILQ_INSERT_TAIL(&bucket->evict_queue, page, evict_data.evict_q);
     __wt_spin_unlock(session, &bucket->evict_queue_lock);
 
     page->evict_data.bucket = bucket;
-
+//    __wt_atomic_addv64(&bucketset->bucketset_num_items, 1);
 #if defined(HAVE_DIAGNOSTIC)
     //__evict_page_consistency_check(session,  page->evict_data.dhandle, page, is_new, true);
 #endif

@@ -100,7 +100,7 @@ __evict_destination_bucket(WT_SESSION_IMPL *session, uint64_t read_gen)
 {
 #ifdef RANDOM_EVICTION
     (void)read_gen;
-    return (uint64_t)(time(NULL) ^ (unsigned)session->id) % WT_EVICT_NUM_BUCKETS;
+    return  (uint64_t)(__wt_random(&session->rnd)) % WT_EVICT_NUM_BUCKETS;
 #else
     uint64_t contention_adjusted_bucket;
 
@@ -220,6 +220,10 @@ __evict_needs_new_bucket(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_P
     if (__wt_atomic_load_pointer(&page->evict_data.bucket) == NULL)
         return true;
 
+#ifdef RANDOM_EVICTION
+    return false;
+#endif
+
     /*
      * Ok if these turn out to be inconsistent with one another: e.g.,
      * someone modifies the read generation before moving the page to
@@ -231,10 +235,6 @@ __evict_needs_new_bucket(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_P
 
     if (__evict_page_get_bucketset(session, dhandle, page, &bucketset) == false)
         return true;
-
-#ifdef RANDOM_EVICTION
-    return false;
-#endif
 
     if (read_gen == WT_READGEN_WONT_NEED || read_gen == WT_READGEN_EVICT_SOON)
         return false;
@@ -266,6 +266,22 @@ __evict_read_gen(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __evict_readgen_is_soon_or_wont_need --
+ *     Return whether a read generation value makes a page eligible for forced eviction. Read
+ *     generations reserve a range of low numbers for special meanings and currently - with the
+ *     exception of the generation not being set - these indicate the page may be evicted
+ *     forcefully.
+ */
+static WT_INLINE bool
+__evict_readgen_is_soon_or_wont_need(uint64_t *readgen)
+{
+    uint64_t gen;
+
+    WT_READ_ONCE(gen, *readgen);
+    return (gen != WT_READGEN_NOTSET && gen < WT_READGEN_START_VALUE);
+}
+
+/*
  * __wti_evict_read_gen_bump --
  *     Update the page's read generation. Return true if we bumped the read generation.
  */
@@ -273,7 +289,8 @@ static WT_INLINE bool
 __wti_evict_read_gen_bump(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     /* Ignore pages set for forcible eviction. */
-    if (__wt_atomic_load64(&page->evict_data.read_gen) == WT_READGEN_EVICT_SOON)
+    //if (__wt_atomic_load64(&page->evict_data.read_gen) == WT_READGEN_EVICT_SOON)
+    if (__evict_readgen_is_soon_or_wont_need(&page->evict_data.read_gen))
         return false;
 
     /* Ignore pages already in the future. */
@@ -289,22 +306,6 @@ __wti_evict_read_gen_bump(WT_SESSION_IMPL *session, WT_PAGE *page)
      */
     __wt_atomic_store64(&page->evict_data.read_gen, __evict_read_gen(session) + WT_READGEN_STEP);
     return true;
-}
-
-/*
- * __evict_readgen_is_soon_or_wont_need --
- *     Return whether a read generation value makes a page eligible for forced eviction. Read
- *     generations reserve a range of low numbers for special meanings and currently - with the
- *     exception of the generation not being set - these indicate the page may be evicted
- *     forcefully.
- */
-static WT_INLINE bool
-__evict_readgen_is_soon_or_wont_need(uint64_t *readgen)
-{
-    uint64_t gen;
-
-    WT_READ_ONCE(gen, *readgen);
-    return (gen != WT_READGEN_NOTSET && gen < WT_READGEN_START_VALUE);
 }
 
 /* !!!
