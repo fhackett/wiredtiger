@@ -74,9 +74,7 @@ struct __wt_evict_bucketset {
     /* the array must be the first thing in the structure for pointer arithmetic to work */
     struct __wt_evict_bucket buckets[WT_EVICT_NUM_BUCKETS];
     uint32_t bucket_last_considered; /* must be updated atomically */
-    WT_CACHE_LINE_PAD_BEGIN
     uint64_t bucketset_num_items;    /* must be updated atomically */
-    WT_CACHE_LINE_PAD_END
 };
 
 /*

@@ -996,6 +996,9 @@ __evict_get_ref(
     WT_REF *ref;
     WT_REF_STATE previous_state;
     uint32_t i, iter, j, max_level, total_iter;
+    int locked_bucket, hazard_check, locked_ref, locked_ref2, skip_flag, skip_function, queue_empty;
+
+    locked_bucket = hazard_check = locked_ref = locked_ref2 = skip_flag = skip_function = queue_empty = 0;
 
     *btreep = NULL;
     bucketset = NULL;
@@ -1042,48 +1045,43 @@ __evict_get_ref(
 
     for (i = 0; i <= max_level; i++) {
         bucketset = WT_DHANDLE_TO_BUCKETSET(dhandle, i);
-#if 0
-        if (bucketset->bucketset_num_items < WT_EVICT_EXPECTED_CONTENTION) {
-            printf("Skipping %d level , %" PRIu64 " items\n", (int)i, bucketset->bucketset_num_items);
+
+        if (bucketset->bucketset_num_items == 0)
             continue;
-        }
-#endif
-        //printf("%d, %" PRIu64 "\n", (int)i, bucketset->bucketset_num_items);
 
         for (j = __wt_atomic_load32(&bucketset->bucket_last_considered) % WT_EVICT_NUM_BUCKETS, iter = 0;
              iter++ < WT_EVICT_NUM_BUCKETS; j = (j+1) % WT_EVICT_NUM_BUCKETS) {
 
             total_iter++;
             bucket = &bucketset->buckets[j];
-            if (__wt_spin_trylock(session, &bucket->evict_queue_lock) == EBUSY)
+
+            if (__wt_spin_trylock(session, &bucket->evict_queue_lock) == EBUSY) {
+                locked_bucket++;
                 continue;
+            }
 
             __wt_atomic_store32(&bucketset->bucket_last_considered, j);
+
+            if (TAILQ_EMPTY(&bucket->evict_queue))
+                queue_empty++;
 
             /* Iterate over the pages in the bucket until we find one that's available. */
             TAILQ_FOREACH (page, &bucket->evict_queue, evict_data.evict_q) {
                 ref = page->ref;
                 WT_ASSERT(session, ref != NULL);
-#ifdef HAVE_DIAGNOSTIC
-                if ((previous_state = WT_REF_GET_STATE(ref)) != WT_REF_MEM
-                    && previous_state != WT_REF_LOCKED) {
-                    WT_IGNORE_RET(__wt_msg(session,
-                        "page (%s) %p has state %d, but is in eviction structures\n",
-                        __wt_page_type_string(ref->page->type), (void*)ref->page, previous_state));
-                    fflush(stdout);
-                    WT_ASSERT(session, false);
-                }
-#endif
+
                 /* Try to lock the reference. If it's already locked, skip it. */
                 previous_state =  WT_REF_GET_STATE(ref);
                 if (previous_state == WT_REF_LOCKED) {
                     WT_STAT_CONN_INCR(session, eviction_skip_pages_locked_or_evicted);
                     ref = NULL;
+                    locked_ref++;
                     continue;
                 } else if (previous_state == WT_REF_MEM) {
                     if (!WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED)) {
                         WT_STAT_CONN_INCR(session, eviction_skip_pages_locked_or_evicted);
                         ref = NULL;
+                        locked_ref2++;
                         continue;
                     }
                 }
@@ -1095,6 +1093,7 @@ __evict_get_ref(
                 if (hazard != NULL) {
                     WT_REF_UNLOCK(ref, previous_state);
                     ref = NULL;
+                    hazard_check++;
                     continue;
                 }
                 if (page->evict_data.evict_skip) {
@@ -1108,8 +1107,8 @@ __evict_get_ref(
 
                     WT_STAT_CONN_INCR(session, eviction_skip_pages_flag);
                     __wt_verbose_debug1(session, WT_VERB_EVICTION, "%s",
-                      "eviction skipped a page because skip flag was set");
-
+                                        "eviction skipped a page because skip flag was set");
+                    skip_flag++;
                     continue;
                 } else {
                     bool skip_page;
@@ -1117,6 +1116,7 @@ __evict_get_ref(
                     if (skip_page) {
                         WT_REF_UNLOCK(ref, previous_state);
                         ref = NULL;
+                        skip_function++;
                         continue;
                     } else /* found a reference */
                         goto unlock_bucket_and_done;
@@ -1125,6 +1125,8 @@ __evict_get_ref(
 unlock_bucket_and_done:
             if (ref != NULL) {
                 TAILQ_REMOVE(&bucket->evict_queue, page, evict_data.evict_q);
+                bucketset =  WT_BUCKET_TO_BUCKETSET(page->evict_data.bucket);
+                __wt_atomic_subv64(&bucketset->bucketset_num_items, 1);
                 page->evict_data.bucket = NULL;
             }
             __wt_spin_unlock(session, &bucket->evict_queue_lock);
@@ -1133,7 +1135,6 @@ unlock_bucket_and_done:
         }
     }
 done:
-    //printf("iter: %" PRIu32 ", reached level %d, %s\n", total_iter, (int)i, ref==NULL?"not found":"found");
     if (ref != NULL) {
         *btreep = ref->page->evict_data.dhandle->handle;
         *previous_statep = previous_state;
@@ -1157,7 +1158,7 @@ done:
 #endif
 
     return (ret);
-}
+    }
 
 /*
  * __evict_page --
@@ -1681,7 +1682,7 @@ __wt_evict_init_handle_data(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
 void
 __wt_evict_remove(WT_SESSION_IMPL *session, WT_REF *ref, bool destroying)
 {
-    //WT_EVICT_BUCKETSET *bucketset;
+    WT_EVICT_BUCKETSET *bucketset;
     WT_PAGE *page;
     WT_REF_STATE previous_state;
     bool must_unlock_ref;
@@ -1725,7 +1726,7 @@ __wt_evict_remove(WT_SESSION_IMPL *session, WT_REF *ref, bool destroying)
 #endif
         __wt_spin_unlock(session, &page->evict_data.bucket->evict_queue_lock);
 
-#if 0
+#if 1
         bucketset =  WT_BUCKET_TO_BUCKETSET(page->evict_data.bucket);
         __wt_atomic_subv64(&bucketset->bucketset_num_items, 1);
 #endif
@@ -1878,7 +1879,7 @@ __wt_evict_enqueue_page(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_RE
     __wt_spin_unlock(session, &bucket->evict_queue_lock);
 
     page->evict_data.bucket = bucket;
-//    __wt_atomic_addv64(&bucketset->bucketset_num_items, 1);
+    __wt_atomic_addv64(&bucketset->bucketset_num_items, 1);
 #if defined(HAVE_DIAGNOSTIC)
     //__evict_page_consistency_check(session,  page->evict_data.dhandle, page, is_new, true);
 #endif

@@ -289,7 +289,6 @@ static WT_INLINE bool
 __wti_evict_read_gen_bump(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     /* Ignore pages set for forcible eviction. */
-    //if (__wt_atomic_load64(&page->evict_data.read_gen) == WT_READGEN_EVICT_SOON)
     if (__evict_readgen_is_soon_or_wont_need(&page->evict_data.read_gen))
         return false;
 
