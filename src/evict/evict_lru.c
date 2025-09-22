@@ -1121,8 +1121,6 @@ __evict_get_ref(
 unlock_bucket_and_done:
             if (ref != NULL) {
                 TAILQ_REMOVE(&bucket->evict_queue, page, evict_data.evict_q);
-                bucketset =  WT_BUCKET_TO_BUCKETSET(page->evict_data.bucket);
-                __wt_atomic_subv64(&bucketset->bucketset_num_items, 1);
                 page->evict_data.bucket = NULL;
             }
             __wt_spin_unlock(session, &bucket->evict_queue_lock);
@@ -1135,6 +1133,10 @@ done:
         *btreep = ref->page->evict_data.dhandle->handle;
         *previous_statep = previous_state;
         *refp = ref;
+
+        /* Decrement item count in the page's former bucketset */
+        __wt_atomic_subv64(&bucketset->bucketset_num_items, 1);
+
         /*
          * Increment the busy count in the btree handle to prevent it from being closed under us.
          */
