@@ -86,9 +86,9 @@ __wt_evict_cache_stuck(WT_SESSION_IMPL *session)
  * length of bucket array.
  */
 static uint64_t
-__evict_base_bucket(uint64_t read_gen)
+__evict_base_bucket(uint64_t read_gen, uint32_t num_buckets)
 {
-    return (read_gen / WT_READGEN_STEP * WT_EVICT_EXPECTED_CONTENTION) % WT_EVICT_NUM_BUCKETS;
+    return (read_gen / WT_READGEN_STEP * WT_EVICT_EXPECTED_CONTENTION) % num_buckets;
 }
 
 /*
@@ -96,7 +96,8 @@ __evict_base_bucket(uint64_t read_gen)
  *       Given the read generation, find the id of its destination bucket.
  */
 static WT_INLINE uint64_t
-__evict_destination_bucket(WT_SESSION_IMPL *session, uint64_t read_gen)
+__evict_destination_bucket(WT_SESSION_IMPL *session, uint64_t read_gen,
+                           WT_EVICT_BUCKETSET *bucketset)
 {
 #ifdef RANDOM_EVICTION
     (void)read_gen;
@@ -110,13 +111,13 @@ __evict_destination_bucket(WT_SESSION_IMPL *session, uint64_t read_gen)
      */
     if (read_gen == WT_READGEN_WONT_NEED || read_gen == WT_READGEN_EVICT_SOON) {
         contention_adjusted_bucket =
-            (uint64_t)(__wt_random(&session->rnd)) % WT_EVICT_NUM_BUCKETS;
+            (uint64_t)(__wt_random(&session->rnd)) % bucketset->num_buckets;
         return contention_adjusted_bucket;
 //          return (uint64_t)(time(NULL) ^ (unsigned)pthread_self()) % WT_EVICT_NUM_BUCKETS;
     }
     contention_adjusted_bucket =
-        (__evict_base_bucket(read_gen) + session->id % WT_EVICT_EXPECTED_CONTENTION)
-        % WT_EVICT_NUM_BUCKETS;
+        (__evict_base_bucket(read_gen, bucketset->num_buckets) + session->id % WT_EVICT_EXPECTED_CONTENTION)
+        % (uint64_t)bucketset->num_buckets;
     return contention_adjusted_bucket;
 #endif
 }
@@ -240,14 +241,14 @@ __evict_needs_new_bucket(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_P
         return false;
 
     if (ret_id != NULL)
-        *ret_id = __evict_destination_bucket(session, read_gen);
+        *ret_id = __evict_destination_bucket(session, read_gen, bucketset);
 
     /*
      * If the page is somewhere between the base bucket for its current read generation and
      * the read generation at the next step, it's in the right place.
      */
-    if (cur_bucket_id >= __evict_base_bucket(read_gen) &&
-        cur_bucket_id < __evict_base_bucket(read_gen + WT_READGEN_STEP)) {
+    if (cur_bucket_id >= __evict_base_bucket(read_gen, bucketset->num_buckets) &&
+        cur_bucket_id < __evict_base_bucket(read_gen + WT_READGEN_STEP, bucketset->num_buckets)) {
         return false;
     }
     else {
