@@ -46,9 +46,8 @@
  * and 40GB cache with 196GB system RAM, 20 workload threads and one eviction thread.
  * TODO: understand how to set this parameter based on the cache size and the number of threads.
  */
-#define WT_EVICT_NUM_BUCKETS_REGULAR (400 * WT_EVICT_EXPECTED_CONTENTION)
-//#define WT_EVICT_NUM_BUCKETS_WONT_NEED 23
-#define WT_EVICT_NUM_BUCKETS_WONT_NEED WT_EVICT_NUM_BUCKETS_REGULAR
+#define WT_EVICT_NUM_BUCKETS (400 * WT_EVICT_EXPECTED_CONTENTION)
+//#define WT_EVICT_NUM_BUCKETS 14
 
 #define WT_EVICT_LEVEL_WONT_NEED_LEAF 0
 #define WT_EVICT_LEVEL_CLEAN_LEAF 1
@@ -70,21 +69,12 @@ struct __wt_evict_bucket {
  * Each tree has its pages organized in several bucket sets: one for internal pages, one for clean
  * leaf pages and one for dirty leaf pages. Clean leaf pages are at the highest priority for
  * eviction, followed by the dirty leaf pages and followed by the internal pages.
- *
- * We initially configure each bucket set with a statically chosen number of buckets.
- * For bucket sets that do not organize pages according to their read generations
- * (e.g., won't need bucket sets) we will lower the number of usable buckets if the
- * buckets are not used. This reduces the need to check empty buckets. This is what
- * the "maximum buckets" variable is for.
  */
 struct __wt_evict_bucketset {
     /* the array must be the first thing in the structure for pointer arithmetic to work */
-    struct __wt_evict_bucket buckets[WT_EVICT_NUM_BUCKETS_REGULAR];
+    struct __wt_evict_bucket buckets[WT_EVICT_NUM_BUCKETS];
     uint32_t bucket_last_considered; /* must be updated atomically */
-    WT_CACHE_LINE_PAD_BEGIN
     uint64_t bucketset_num_items;    /* must be updated atomically */
-    WT_CACHE_LINE_PAD_END
-    uint32_t num_buckets;
 };
 
 /*
