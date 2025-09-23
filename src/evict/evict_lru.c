@@ -1041,10 +1041,10 @@ __evict_get_ref(
 
     for (i = 0; i <= max_level; i++) {
         bucketset = WT_DHANDLE_TO_BUCKETSET(dhandle, i);
-
+#if 1
         if (bucketset->bucketset_num_items == 0)
             continue;
-
+#endif
         for (j = __wt_atomic_load32(&bucketset->bucket_last_considered) % WT_EVICT_NUM_BUCKETS, iter = 0;
              iter++ < WT_EVICT_NUM_BUCKETS; j = (j+1) % WT_EVICT_NUM_BUCKETS) {
 
@@ -1796,9 +1796,6 @@ __wt_evict_enqueue_page(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_RE
 
     page->evict_data.bucket = bucket;
     __wt_atomic_addv64(&bucketset->bucketset_num_items, 1);
-#if defined(HAVE_DIAGNOSTIC)
-    //__evict_page_consistency_check(session,  page->evict_data.dhandle, page, is_new, true);
-#endif
 
     WT_STAT_CONN_INCR(session, eviction_enqueued_page);
 done:

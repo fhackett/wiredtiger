@@ -41,12 +41,10 @@
 #define WT_EVICT_EXPECTED_CONTENTION WT_STAT_CONN_COUNTER_SLOTS
 
 /*
- * 400 for the bucket multiplier was an experimentally measured sweet spot for YCSB-C with
- * 130GB database
- * and 40GB cache with 196GB system RAM, 20 workload threads and one eviction thread.
- * TODO: understand how to set this parameter based on the cache size and the number of threads.
+ * The number of buckets is set at initialization. It is computed as the size of cache in GB
+ * times ten, times expected contention (see above variable). If this value computes to zero,
+ * we use the number of buckets equivalent to expected contention.
  */
-//#define WT_EVICT_NUM_BUCKETS (400 * WT_EVICT_EXPECTED_CONTENTION)
 static uint64_t WT_EVICT_NUM_BUCKETS;
 
 #define WT_EVICT_LEVEL_WONT_NEED_LEAF 0
@@ -74,11 +72,11 @@ struct __wt_evict_bucket {
  * eviction, followed by the dirty leaf pages and followed by the internal pages.
  */
 struct __wt_evict_bucketset {
-    /* the array must be the first thing in the structure for pointer arithmetic to work */
-//    struct __wt_evict_bucket buckets[WT_EVICT_NUM_BUCKETS];
     struct __wt_evict_bucket *buckets;
     uint32_t bucket_last_considered; /* must be updated atomically */
+    WT_CACHE_LINE_PAD_BEGIN
     uint64_t bucketset_num_items;    /* must be updated atomically */
+    WT_CACHE_LINE_PAD_END
 };
 
 /*
