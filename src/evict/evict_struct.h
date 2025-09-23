@@ -46,8 +46,8 @@
  * and 40GB cache with 196GB system RAM, 20 workload threads and one eviction thread.
  * TODO: understand how to set this parameter based on the cache size and the number of threads.
  */
-#define WT_EVICT_NUM_BUCKETS (400 * WT_EVICT_EXPECTED_CONTENTION)
-//#define WT_EVICT_NUM_BUCKETS 14
+//#define WT_EVICT_NUM_BUCKETS (400 * WT_EVICT_EXPECTED_CONTENTION)
+static uint64_t WT_EVICT_NUM_BUCKETS;
 
 #define WT_EVICT_LEVEL_WONT_NEED_LEAF 0
 #define WT_EVICT_LEVEL_CLEAN_LEAF 1
@@ -57,10 +57,13 @@
 #define WT_EVICT_LEVEL_DIRTY_INTERNAL 5
 #define WT_EVICT_LEVELS WT_EVICT_LEVEL_DIRTY_INTERNAL + 1
 
+struct __wt_evict_bucketset;
+
 struct __wt_evict_bucket {
     WT_SPINLOCK evict_queue_lock;
     TAILQ_HEAD(__wt_evictbucket_qh, __wt_page) evict_queue;
     uint64_t id; /* index in the bucket set */
+    struct __wt_evict_bucketset *bucketset;
 };
 
 /*
@@ -72,7 +75,8 @@ struct __wt_evict_bucket {
  */
 struct __wt_evict_bucketset {
     /* the array must be the first thing in the structure for pointer arithmetic to work */
-    struct __wt_evict_bucket buckets[WT_EVICT_NUM_BUCKETS];
+//    struct __wt_evict_bucket buckets[WT_EVICT_NUM_BUCKETS];
+    struct __wt_evict_bucket *buckets;
     uint32_t bucket_last_considered; /* must be updated atomically */
     uint64_t bucketset_num_items;    /* must be updated atomically */
 };

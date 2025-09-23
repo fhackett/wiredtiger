@@ -8,13 +8,9 @@
 
 #include "wt_internal.h"
 static void __evict_choose_dhandle(WT_SESSION_IMPL *session, WT_DATA_HANDLE **dhandle_p);
-//static void __evict_help_organize_buckets(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle,
-//                              WT_EVICT_BUCKET *bucket);
 static bool __evict_internal_page_has_cached_children(WT_SESSION_IMPL *sesison, WT_REF *ref);
 static int __evict_lru_pages(WT_SESSION_IMPL *session, bool is_server);
 static int __evict_page(WT_SESSION_IMPL *session);
-static bool __evict_page_consistency_check(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle,
-                                           WT_PAGE *page, bool new, bool verbose);
 static void __evict_read_gen_new(WT_SESSION_IMPL *session, WT_PAGE *page);
 static int __evict_server(WT_SESSION_IMPL *session, bool *did_work);
 static bool __evict_skip_page(WT_SESSION_IMPL *session, WT_REF *ref);
@@ -1125,8 +1121,6 @@ __evict_get_ref(
 unlock_bucket_and_done:
             if (ref != NULL) {
                 TAILQ_REMOVE(&bucket->evict_queue, page, evict_data.evict_q);
-                bucketset =  WT_BUCKET_TO_BUCKETSET(page->evict_data.bucket);
-                __wt_atomic_subv64(&bucketset->bucketset_num_items, 1);
                 page->evict_data.bucket = NULL;
             }
             __wt_spin_unlock(session, &bucket->evict_queue_lock);
@@ -1139,6 +1133,10 @@ done:
         *btreep = ref->page->evict_data.dhandle->handle;
         *previous_statep = previous_state;
         *refp = ref;
+
+        /* Decrement items in the bucketset where the page came from */
+        __wt_atomic_subv64(&bucketset->bucketset_num_items, 1);
+
         /*
          * Increment the busy count in the btree handle to prevent it from being closed under us.
          */
@@ -1151,11 +1149,6 @@ done:
     /* Release the dhandle */
     WT_ASSERT(session, __wt_atomic_loadi32(&dhandle->session_inuse) > 0);
     (void)__wt_atomic_subi32(&dhandle->session_inuse, 1);
-
-#if defined(HAVE_DIAGNOSTIC)
-//  if (ref != NULL)
-//      __evict_page_consistency_check(session,  ref->page->evict_data.dhandle, ref->page, false, true);
-#endif
 
     return (ret);
     }
@@ -1483,9 +1476,6 @@ __verbose_dump_cache_single(WT_SESSION_IMPL *session, uint64_t *total_bytesp,
         page = next_walk->page;
         size = __wt_atomic_loadsize(&page->memory_footprint);
 
-        if (__evict_page_consistency_check(session, dhandle, page, false, true) == false)
-            WT_RET(__wt_msg(session, "page %p inconsistent eviction state", (void*)page));
-
         if (F_ISSET(next_walk, WT_REF_FLAG_INTERNAL)) {
             ++intl_pages;
             intl_bytes += size;
@@ -1648,13 +1638,19 @@ __wt_evict_init_handle_data(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
     WT_EVICT_BUCKET *bucket;
     WT_EVICT_BUCKETSET *bucketset;
     WT_EVICT_HANDLE_DATA *evict_data;
-    int i, j;
+    uint64_t cache_size_GB, i, j;
 
     if (!WT_DHANDLE_BTREE(dhandle))
         return (0);
 
     btree = dhandle->handle;
     evict_data = &btree->evict_data;
+    cache_size_GB = S2C(session)->cache_size / WT_GIGABYTE;
+    WT_EVICT_NUM_BUCKETS = cache_size_GB * 10 * WT_EVICT_EXPECTED_CONTENTION;
+    if (WT_EVICT_NUM_BUCKETS == 0)
+        WT_EVICT_NUM_BUCKETS = WT_EVICT_EXPECTED_CONTENTION;
+
+    printf("num buckets is %" PRIu64 "\n", WT_EVICT_NUM_BUCKETS);
 
     /*
      * We have a few bucket sets organized by eviction priority. Lower numbered bucket set means
@@ -1663,8 +1659,11 @@ __wt_evict_init_handle_data(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
      */
     for (i = 0; i < WT_EVICT_LEVELS; i++) {
         bucketset = &evict_data->evict_bucketset[i];
+        WT_RET(__wt_calloc(session, WT_EVICT_NUM_BUCKETS, sizeof(WT_EVICT_BUCKET), &bucketset->buckets));
+
         for (j = 0; j < WT_EVICT_NUM_BUCKETS; j++) {
             bucket = &bucketset->buckets[j];
+            bucket->bucketset = bucketset;
             bucket->id = (uint64_t)j;
             WT_RET(__wt_spin_init(session, &bucket->evict_queue_lock, "evict bucket queue lock"));
             TAILQ_INIT(&bucket->evict_queue);
@@ -1682,7 +1681,6 @@ __wt_evict_init_handle_data(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
 void
 __wt_evict_remove(WT_SESSION_IMPL *session, WT_REF *ref, bool destroying)
 {
-    WT_EVICT_BUCKETSET *bucketset;
     WT_PAGE *page;
     WT_REF_STATE previous_state;
     bool must_unlock_ref;
@@ -1717,19 +1715,9 @@ __wt_evict_remove(WT_SESSION_IMPL *session, WT_REF *ref, bool destroying)
     if (!WT_EVICT_PAGE_CLEARED(page)) {
         __wt_spin_lock(session, &page->evict_data.bucket->evict_queue_lock);
         TAILQ_REMOVE(&page->evict_data.bucket->evict_queue, page, evict_data.evict_q);
-
-#if EVICT_DEBUG_PRINT
-        printf("page %p readgen %llu removed by session %d from evict structs. Bucket: %p,  next = %p, prev = %p\n",
-               (void*)page,  ref->page->evict_data.read_gen, (int)session->id, (void*)page->evict_data.bucket,
-               (void*)(page->evict_data.evict_q.tqe_next), (void*)(page->evict_data.evict_q.tqe_prev));
-        fflush(stdout);
-#endif
         __wt_spin_unlock(session, &page->evict_data.bucket->evict_queue_lock);
 
-#if 1
-        bucketset =  WT_BUCKET_TO_BUCKETSET(page->evict_data.bucket);
-        __wt_atomic_subv64(&bucketset->bucketset_num_items, 1);
-#endif
+        __wt_atomic_subv64(&page->evict_data.bucket->bucketset->bucketset_num_items, 1);
         page->evict_data.bucket = NULL;
 
         if (destroying)
@@ -1738,78 +1726,6 @@ __wt_evict_remove(WT_SESSION_IMPL *session, WT_REF *ref, bool destroying)
 
     if (must_unlock_ref)
         WT_REF_UNLOCK(ref, previous_state);
-}
-
-/*
- * __evict_page_consistency_check --
- *     Check that the page is in the right place in the eviction data structures.
- */
-static bool
-__evict_page_consistency_check(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_PAGE *page,
-                               bool new, bool verbose)
-{
-    WT_EVICT_BUCKETSET *bucketset;
-    WT_EVICT_HANDLE_DATA *evict_handle_data;
-    WT_REF_STATE state;
-
-    evict_handle_data = &((WT_BTREE*)dhandle->handle)->evict_data;
-
-    if (!WT_DHANDLE_BTREE(dhandle)) {
-        if (verbose)
-            WT_RET(__wt_msg(session, "page %s %p: dhandle is not btree, should not be in eviction",
-                            __wt_page_type_string(page->type), (void*)page));
-        return (false);
-    }
-    if (page->ref == NULL) {
-        if (verbose)
-            WT_RET(__wt_msg(session, "page (%s) %p does not have an associated reference",
-                            __wt_page_type_string(page->type), (void*)page));
-        return (false);
-    }
-    if (page->evict_data.dhandle != dhandle) {
-        if (verbose)
-            WT_RET(__wt_msg(session, "page %p dhandle mismatch. Expected %s, got %s",
-                            (void*) page, (dhandle == NULL) ? "null" : dhandle->name,
-                   (page->evict_data.dhandle == NULL) ? "null" : page->evict_data.dhandle->name));
-        return (false);
-    }
-    if (!new) {
-        if ((state = WT_REF_GET_STATE(page->ref)) != WT_REF_LOCKED && state != WT_REF_MEM) {
-            if (verbose)
-                WT_RET(__wt_msg(session, "page %s %p state is neither locked nor in-memory\n",
-                                __wt_page_type_string(page->type), (void*)page));
-            fflush(stdout);
-            while(1);
-            return (false);
-        }
-    }
-    WT_ASSERT(session, page->evict_data.bucket->id < WT_EVICT_NUM_BUCKETS);
-    if(__evict_page_get_bucketset(session, dhandle, page, &bucketset) == false)
-        return (false);
-
-    if (bucketset == NULL) {
-        if (verbose)
-            WT_RET(__wt_msg(session,
-            "page (%s) %p is not in a bucketset or the bucketset does not belong to its dhandle",
-                            __wt_page_type_string(page->type),(void*)page));
-        return (false);
-    }
-
-    if (page->evict_data.bucket != NULL && page->evict_data.evict_q.tqe_next == NULL &&
-        page->evict_data.evict_q.tqe_prev == NULL) {
-        WT_RET(__wt_msg(session, "page (%s) %p is in a bucket %p, but not in a queue",
-                        __wt_page_type_string(page->type),(void*)page, (void*)page->evict_data.bucket));
-        return (false);
-    }
-
-    if (!evict_handle_data->initialized) {
-        if (verbose)
-            WT_RET(__wt_msg(session,
-               "page (%s) %p is in a bucket, but dhandle evict data uninitialized",
-                            __wt_page_type_string(page->type),(void*)page));
-        return (false);
-    }
-    return (true);
 }
 
 /*
@@ -1832,7 +1748,7 @@ __wt_evict_enqueue_page(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_RE
     if (__wt_ref_is_root(ref))
         return;
 
-    if (!WT_DHANDLE_BTREE(dhandle) || !F_ISSET(dhandle, WT_DHANDLE_OPEN))
+    if (!WT_DHANDLE_BTREE(dhandle) || !F_ISSET(dhandle, WT_DHANDLE_OPEN) || WT_IS_METADATA(dhandle))
         return;
 
     /*

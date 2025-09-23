@@ -196,7 +196,7 @@ __evict_page_get_bucketset(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT
         return false;
     }
 
-    *bucketset =  WT_BUCKET_TO_BUCKETSET(page->evict_data.bucket);
+    *bucketset =  page->evict_data.bucket->bucketset;
     if (&evict_handle_data->evict_bucketset[correct_bucketset_level] == *bucketset)
         return true;
     else
