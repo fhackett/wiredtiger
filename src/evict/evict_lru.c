@@ -1041,10 +1041,10 @@ __evict_get_ref(
 
     for (i = 0; i <= max_level; i++) {
         bucketset = WT_DHANDLE_TO_BUCKETSET(dhandle, i);
-#if 1
+
         if (bucketset->bucketset_num_items == 0)
             continue;
-#endif
+
         for (j = __wt_atomic_load32(&bucketset->bucket_last_considered) % WT_EVICT_NUM_BUCKETS, iter = 0;
              iter++ < WT_EVICT_NUM_BUCKETS; j = (j+1) % WT_EVICT_NUM_BUCKETS) {
 
@@ -1638,19 +1638,37 @@ __wt_evict_init_handle_data(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
     WT_EVICT_BUCKET *bucket;
     WT_EVICT_BUCKETSET *bucketset;
     WT_EVICT_HANDLE_DATA *evict_data;
-    uint64_t cache_size_GB, i, j;
+    uint64_t cache_size, file_size, i, j, file_cache_ratio;
 
     if (!WT_DHANDLE_BTREE(dhandle))
         return (0);
 
     btree = dhandle->handle;
     evict_data = &btree->evict_data;
-    cache_size_GB = S2C(session)->cache_size / WT_GIGABYTE;
-    WT_EVICT_NUM_BUCKETS = cache_size_GB * 10 * WT_EVICT_EXPECTED_CONTENTION;
-    if (WT_EVICT_NUM_BUCKETS == 0)
-        WT_EVICT_NUM_BUCKETS = WT_EVICT_EXPECTED_CONTENTION;
 
-    printf("num buckets is %" PRIu64 "\n", WT_EVICT_NUM_BUCKETS);
+    cache_size = WT_MAX(S2C(session)->cache_size / WT_MEGABYTE, 1);
+    file_size = WT_MAX((uint64_t)btree->bm->block->size / WT_MEGABYTE, 1);
+    file_cache_ratio = file_size / cache_size;
+
+    /*
+     * Workloads with a healthy file to cache size ratio are not dominated by
+     * eviction, so having many buckets is good: less contention on the read
+     * path when we are moving accessed pages between buckets.
+     *
+     * For degenerate workloads whose caches are miniscule compared to the
+     * file, eviction dominates the runtime. For these workloads we don't
+     * want to have many buckets if there are very few cached pages. In this
+     * case, eviction wastes time walking over empty buckets, and that hurts
+     * performance.
+     */
+    if (file_cache_ratio < 1000)
+        WT_EVICT_NUM_BUCKETS = 400 * WT_EVICT_EXPECTED_CONTENTION;
+    else {
+        WT_EVICT_NUM_BUCKETS = WT_EVICT_EXPECTED_CONTENTION;
+    }
+
+    printf("num buckets is %" PRIu64 ", file size is %" PRIu64 ", cache size is %" PRIu64 "\n",
+           WT_EVICT_NUM_BUCKETS, (uint64_t)file_size, (uint64_t)cache_size);
 
     /*
      * We have a few bucket sets organized by eviction priority. Lower numbered bucket set means

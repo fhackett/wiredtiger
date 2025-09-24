@@ -1,5 +1,5 @@
 # wtperf options file: small btree with short keys configuration
-conn_config="cache_size=500MB"
+conn_config="cache_size=500MB,eviction=(threads_max=8)"
 table_config="type=file"
 icount=500000
 key_sz=9
