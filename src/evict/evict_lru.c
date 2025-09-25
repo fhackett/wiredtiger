@@ -1215,13 +1215,6 @@ __evict_page(WT_SESSION_IMPL *session)
     } else
         __wt_atomic_addv64(&S2C(session)->evict->evicted_pages, 1);
 
-    /*
-     * Help ordering the buckets by opportunistically moving pages to the right buckets if they
-     * end up in a bucket that's too young for them.
-     *
-    if (bucket != NULL)
-        __evict_help_organize_buckets(session, btree->dhandle, bucket);
-    */
     WT_TRACK_OP_END(session);
     return (ret);
 }
