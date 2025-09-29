@@ -72,9 +72,9 @@ struct __wt_evict_bucket {
  * eviction, followed by the dirty leaf pages and followed by the internal pages.
  */
 struct __wt_evict_bucketset {
+    WT_CACHE_LINE_PAD_BEGIN
     struct __wt_evict_bucket *buckets;
     uint32_t bucket_last_considered; /* must be updated atomically */
-    WT_CACHE_LINE_PAD_BEGIN
     uint64_t bucketset_num_items;    /* must be updated atomically */
     WT_CACHE_LINE_PAD_END
 };

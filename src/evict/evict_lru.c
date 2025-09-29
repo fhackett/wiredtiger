@@ -1654,11 +1654,13 @@ __wt_evict_init_handle_data(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
      * case, eviction wastes time walking over empty buckets, and that hurts
      * performance.
      */
-    if (file_cache_ratio < 1000)
+
+    if (file_cache_ratio < 100) /* healthy ratio, contention dominates */
         WT_EVICT_NUM_BUCKETS = 400 * WT_EVICT_EXPECTED_CONTENTION;
-    else {
+    else if (file_cache_ratio < 1000){ /* poor ratio, bucket search becomes important */
+        WT_EVICT_NUM_BUCKETS = 10 * WT_EVICT_EXPECTED_CONTENTION;
+    } else /* extremely poor ratio, bucket searches dominate */
         WT_EVICT_NUM_BUCKETS = WT_EVICT_EXPECTED_CONTENTION;
-    }
 
     printf("num buckets is %" PRIu64 ", file size is %" PRIu64 ", cache size is %" PRIu64 "\n",
            WT_EVICT_NUM_BUCKETS, (uint64_t)file_size, (uint64_t)cache_size);
