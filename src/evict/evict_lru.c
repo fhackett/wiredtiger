@@ -991,7 +991,7 @@ __evict_get_ref(
     WT_PAGE *page;
     WT_REF *ref;
     WT_REF_STATE previous_state;
-    uint32_t i, iter, j, max_level, total_iter;
+    uint32_t i, iter, j, max_level;
     int locked_bucket, hazard_check, locked_ref, locked_ref2, skip_flag, skip_function, queue_empty;
 
     locked_bucket = hazard_check = locked_ref = locked_ref2 = skip_flag = skip_function = queue_empty = 0;
@@ -1004,7 +1004,7 @@ __evict_get_ref(
     iter = 0;
     max_level = 0;
     previous_state = 0;
-    total_iter = 0;
+
     /*
      * It is polite to initialize output variables, but it isn't safe for callers to use the
      * previous state if we don't return a locked ref.
@@ -1048,7 +1048,6 @@ __evict_get_ref(
         for (j = __wt_atomic_load32(&bucketset->bucket_last_considered) % WT_EVICT_NUM_BUCKETS, iter = 0;
              iter++ < WT_EVICT_NUM_BUCKETS; j = (j+1) % WT_EVICT_NUM_BUCKETS) {
 
-            total_iter++;
             bucket = &bucketset->buckets[j];
 
             if (__wt_spin_trylock(session, &bucket->evict_queue_lock) == EBUSY) {

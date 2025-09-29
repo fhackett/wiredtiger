@@ -337,8 +337,8 @@ conn_stats = [
     EvictStat('eviction_target_bucket_clean_leaf', 'eviction selected pages from clean leaf bucket'),
     EvictStat('eviction_target_bucket_dirty_internal', 'eviction selected pages from dirty internal bucket'),
     EvictStat('eviction_target_bucket_dirty_leaf', 'eviction selected pages from dirty leaf bucket'),
-    EvictStat('eviction_target_bucket_wont_need_internal', 'eviction selected pages from won\'t need internal bucket 0'),
-    EvictStat('eviction_target_bucket_wont_need_leaf', 'eviction selected pages from won\'t need leaf bucket'),
+    EvictStat('eviction_target_bucket_wont_need_internal', 'eviction selected pages from won\'t need internal bucket'),
+    EvictStat('eviction_target_bucket_wont_need_leaf', 'eviction selected pages from won\'t need leaf bucket')s
     EvictStat('eviction_target_strategy_both_clean_and_dirty', 'eviction target strategy both clean and dirty pages'),
     EvictStat('eviction_target_strategy_clean', 'eviction target strategy only clean pages'),
     EvictStat('eviction_target_strategy_dirty', 'eviction target strategy only dirty pages'),
