@@ -1661,8 +1661,8 @@ __wt_evict_init_handle_data(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
     } else /* extremely poor ratio, bucket searches dominate */
         WT_EVICT_NUM_BUCKETS = WT_EVICT_EXPECTED_CONTENTION;
 
-    printf("num buckets is %" PRIu64 ", file size is %" PRIu64 ", cache size is %" PRIu64 "\n",
-           WT_EVICT_NUM_BUCKETS, (uint64_t)file_size, (uint64_t)cache_size);
+    printf("num buckets is %" PRIu64 ", file %s size is %" PRIu64 "MB, cache size is %" PRIu64 "MB\n",
+           WT_EVICT_NUM_BUCKETS, btree->bm->block->name, (uint64_t)file_size, (uint64_t)cache_size);
 
     /*
      * We have a few bucket sets organized by eviction priority. Lower numbered bucket set means
