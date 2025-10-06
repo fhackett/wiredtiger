@@ -1,7 +1,7 @@
 /*-
  * Copyright (c) 2014-present MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
- *	All rights reserved.
+ *  All rights reserved.
  *
  * See the file LICENSE for redistribution information.
  */
@@ -10,8 +10,8 @@
 
 /*
  * WT_DATA_HANDLE_CACHE --
- *	Per-session cache of handles to avoid synchronization when opening
- *	cursors.
+ *  Per-session cache of handles to avoid synchronization when opening
+ *  cursors.
  */
 struct __wt_data_handle_cache {
     WT_DATA_HANDLE *dhandle;
@@ -22,7 +22,7 @@ struct __wt_data_handle_cache {
 
 /*
  * WT_HAZARD --
- *	A hazard pointer.
+ *  A hazard pointer.
  */
 struct __wt_hazard {
     wt_shared WT_REF *ref; /* Page reference */
@@ -51,7 +51,7 @@ struct __wt_hazard_array {
 
 /*
  * WT_PREFETCH --
- *	Pre-fetch structure containing useful information for pre-fetch.
+ *  Pre-fetch structure containing useful information for pre-fetch.
  */
 struct __wt_prefetch {
     WT_PAGE *prefetch_prev_ref_home;
@@ -90,7 +90,7 @@ typedef TAILQ_HEAD(__wt_cursor_list, __wt_cursor) WT_CURSOR_LIST;
 
 /*
  * WT_SESSION_IMPL --
- *	Implementation of WT_SESSION.
+ *  Implementation of WT_SESSION.
  */
 struct __wt_session_impl {
     WT_SESSION iface;

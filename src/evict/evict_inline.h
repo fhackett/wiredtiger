@@ -112,7 +112,6 @@ __evict_destination_bucket(WT_SESSION_IMPL *session, uint64_t read_gen)
         contention_adjusted_bucket =
             (uint64_t)(__wt_random(&session->rnd)) % WT_EVICT_NUM_BUCKETS;
         return contention_adjusted_bucket;
-//          return (uint64_t)(time(NULL) ^ (unsigned)pthread_self()) % WT_EVICT_NUM_BUCKETS;
     }
     contention_adjusted_bucket =
         (__evict_base_bucket(read_gen) + session->id % WT_EVICT_EXPECTED_CONTENTION)

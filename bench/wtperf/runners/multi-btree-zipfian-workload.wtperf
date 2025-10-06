@@ -11,6 +11,7 @@ create=false
 
 run_time=600
 threads=((count=20,reads=1))
+#threads=((count=1,reads=1))
 
 # Warn if a latency over 1 second is seen
 max_latency=1000

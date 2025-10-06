@@ -1,3 +1,4 @@
+
 /*-
  * Copyright (c) 2014-present MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
@@ -1916,28 +1917,32 @@ __evict_choose_dhandle(WT_SESSION_IMPL *session, WT_DATA_HANDLE **dhandle_p)
     WT_DATA_HANDLE *dhandle, *best_dhandle;
     WT_EVICT *evict;
     bool want_tree;
-
-#define EVICT_MAX_FOOTPRINT
-#ifdef EVICT_MAX_FOOTPRINT
-    uint64_t  bytes_inmem, max_cache_footprint;
-#endif
+    uint64_t i, offset;
 
     best_dhandle = *dhandle_p = NULL;
     conn = S2C(session);
     evict = conn->evict;
-#ifdef EVICT_MAX_FOOTPRINT
-    max_cache_footprint = 0;
-#endif
 
     if (__evict_lock_handle_list(session) != 0)
         return;
 
     dhandle = TAILQ_FIRST(&conn->dhqh);
-    for (uint64_t i = 0; i < conn->dhandle_count; i++) {
+
+    /* Don't always start the seach at the beginning of the handle queue */
+    offset = __wt_random(&session->rnd) % conn->dhandle_count;
+
+    for (i = 0; i < offset; i++)
+        dhandle = TAILQ_NEXT(dhandle, q);
+
+    for (i = 0; i < conn->dhandle_count; i++) {
+        if (dhandle == NULL)
+             dhandle = TAILQ_FIRST(&conn->dhqh);
+
         btree = dhandle->handle;
 
         if (!WT_DHANDLE_BTREE(dhandle) || !F_ISSET(dhandle, WT_DHANDLE_OPEN))
             goto next;
+
         /* Skip files that don't allow eviction. */
         if (btree->evict_data.evict_disabled > 0) {
             WT_STAT_CONN_INCR(session, eviction_skip_trees_eviction_disabled);
@@ -1949,8 +1954,8 @@ __evict_choose_dhandle(WT_SESSION_IMPL *session, WT_DATA_HANDLE **dhandle_p)
         if (WT_BTREE_SYNCING(btree) &&
           !F_ISSET(evict, WT_EVICT_CACHE_CLEAN | WT_EVICT_CACHE_UPDATES)) {
             WT_STAT_CONN_INCR(session, eviction_skip_checkpointing_trees);
-            goto next;
-        }
+            goto next;        }
+
         /*
          * Skip files that are configured to stick in cache until we become aggressive.
          *
@@ -1981,20 +1986,16 @@ __evict_choose_dhandle(WT_SESSION_IMPL *session, WT_DATA_HANDLE **dhandle_p)
          * a significant amount of HS dirty content very quickly.
          */
         if (WT_IS_HS(dhandle) && __wti_evict_hs_dirty(session)) {
+            printf("choosing HS\n");
             WT_STAT_CONN_INCR(session, eviction_pages_queued_urgent_hs_dirty);
             best_dhandle = dhandle;
             break;
         }
 
-#ifdef EVICT_MAX_FOOTPRINT
-        bytes_inmem = __wt_atomic_load64(&((WT_BTREE*)dhandle->handle)->bytes_inmem);
-        if (bytes_inmem  > max_cache_footprint) {
-            best_dhandle = dhandle;
-            max_cache_footprint = bytes_inmem;
-        }
-#else
         best_dhandle = dhandle;
-#endif
+        if (best_dhandle != NULL && !WT_IS_HS(dhandle)) { /* XXX Fix. Must consider HS dhandles. */
+            break;
+        }
     next:
         dhandle = TAILQ_NEXT(dhandle, q);
     }
@@ -2005,6 +2006,8 @@ __evict_choose_dhandle(WT_SESSION_IMPL *session, WT_DATA_HANDLE **dhandle_p)
     __wt_readunlock(session, &conn->dhandle_lock);
 
     *dhandle_p = best_dhandle;
+//    printf("%d: dhandle %s selected for eviction\n", (int)(session!=NULL?session->id:0),
+//           best_dhandle->name);
 }
 
 /*
@@ -2015,11 +2018,6 @@ static void
 __evict_read_gen_new(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     WT_IGNORE_RET(__wti_evict_read_gen_bump(session, page));
-#if 0
-    __wt_atomic_store64(
-      &page->evict_data.read_gen,
-      (__evict_read_gen(session) + S2C(session)->evict->read_gen_oldest) / 2);
-#endif
 }
 
 /* !!!
