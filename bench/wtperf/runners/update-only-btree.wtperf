@@ -8,3 +8,4 @@ report_interval=5
 run_time=120
 populate_threads=1
 threads=((count=16,updates=1))
+verbose=2

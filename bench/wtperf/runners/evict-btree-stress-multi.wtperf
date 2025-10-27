@@ -11,3 +11,4 @@ threads=((count=100,updates=1,reads=4,ops_per_txn=30))
 max_latency=250
 sample_interval=5
 sample_rate=1
+verbose=2

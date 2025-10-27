@@ -86,7 +86,10 @@ __ref_track_state(
 #endif
 
 static WT_INLINE void
-__wt_ref_make_visible(WT_SESSION_IMPL *session, WT_REF *ref) {
+__wt_ref_make_visible(WT_SESSION_IMPL *session, WT_REF *ref, bool wont_need) {
+
+    if (ref->page != NULL)
+        WT_ASSERT(session, ref->page->ref == ref);
     /*
      * It is absolutely essential that we reset the owner before making the page
      * visible. Failing to do so will lead to bad race conditions where the
@@ -95,6 +98,7 @@ __wt_ref_make_visible(WT_SESSION_IMPL *session, WT_REF *ref) {
      */
     __atomic_store_n(&ref->owner, 0, __ATOMIC_RELEASE);
     WT_REF_SET_STATE(ref, WT_REF_MEM);
+    __wt_evict_touch_page(session, ref, false, wont_need);
 }
 
 /*

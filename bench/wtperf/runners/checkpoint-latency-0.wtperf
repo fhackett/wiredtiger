@@ -23,3 +23,4 @@ threads=((count=8,inserts=1,throttle=125),(count=8,reads=1,throttle=500))
 value_sz=60000
 # Wait for the throughput to stabilize
 warmup=120
+verbose=2

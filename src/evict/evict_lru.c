@@ -1040,11 +1040,16 @@ __evict_get_ref(
     if (F_ISSET(evict, WT_EVICT_CACHE_DIRTY))
         max_level = WT_EVICT_LEVEL_DIRTY_INTERNAL;
 
+    //printf("Max level = %d\n", (int)max_level);s
     for (i = 0; i <= max_level; i++) {
         bucketset = WT_DHANDLE_TO_BUCKETSET(dhandle, i);
 
-        if (bucketset->bucketset_num_items == 0)
+        /*
+        if (bucketset->bucketset_num_items == 0) {
+            printf("Nothing at level %d\n", (int)i);
             continue;
+        }
+        */
 
         for (j = __wt_atomic_load32(&bucketset->bucket_last_considered) % WT_EVICT_NUM_BUCKETS, iter = 0;
              iter++ < WT_EVICT_NUM_BUCKETS; j = (j+1) % WT_EVICT_NUM_BUCKETS) {
@@ -1068,6 +1073,7 @@ __evict_get_ref(
 
                 /* Try to lock the reference. If it's already locked, skip it. */
                 previous_state =  WT_REF_GET_STATE(ref);
+                WT_ASSERT(session, previous_state == WT_REF_LOCKED || previous_state ==WT_REF_MEM);
                 if (previous_state == WT_REF_LOCKED) {
                     WT_STAT_CONN_INCR(session, eviction_skip_pages_locked_or_evicted);
                     ref = NULL;
@@ -1081,6 +1087,7 @@ __evict_get_ref(
                         continue;
                     }
                 }
+
                 /*
                  * If we are here, we have a ref and it is locked. Make sure we unlock it if we
                  * decide to skip.
@@ -1141,9 +1148,10 @@ done:
          * Increment the busy count in the btree handle to prevent it from being closed under us.
          */
         (void)__wt_atomic_addv32(&((*btreep)->evict_data.evict_busy), 1);
-    } else
+    } else {
         WT_STAT_CONN_INCR(session, eviction_get_ref_empty);
-
+//        printf("Returning null\n");
+    }
     ret = (*refp == NULL ? WT_NOTFOUND : 0);
 
     /* Release the dhandle */
@@ -1764,6 +1772,7 @@ __wt_evict_enqueue_page(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_RE
     if (!WT_DHANDLE_BTREE(dhandle) || !F_ISSET(dhandle, WT_DHANDLE_OPEN) || WT_IS_METADATA(dhandle))
         return;
 
+    WT_ASSERT(session, previous_state == WT_REF_LOCKED || previous_state == WT_REF_MEM);
     /*
      * Lock the page so it doesn't disappear. We aren't evicting the page, so we don't need to check
      * for hazard pointers.

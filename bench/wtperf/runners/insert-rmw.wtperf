@@ -7,3 +7,4 @@ report_interval=5
 run_time=120
 populate_threads=1
 threads=((count=4,inserts=1),(count=2,reads=1))
+verbose=2

@@ -8,3 +8,4 @@ pareto=1
 index=true
 populate_threads=1
 threads=((count=40,reads=1),(count=40,updates=1))
+verbose=2
