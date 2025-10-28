@@ -9,7 +9,7 @@
 #pragma once
 
 #define EVICT_DEBUG_PRINT 0
-//#define RANDOM_EVICTION
+
 /*
  * __wt_ref_assign_page --
  *     Must be called every time we associate a new page with a ref. A page must have a back pointer
