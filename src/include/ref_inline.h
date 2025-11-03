@@ -85,22 +85,6 @@ __ref_track_state(
     } while (0)
 #endif
 
-static WT_INLINE void
-__wt_ref_make_visible(WT_SESSION_IMPL *session, WT_REF *ref, bool wont_need) {
-
-    if (ref->page != NULL)
-        WT_ASSERT(session, ref->page->ref == ref);
-    /*
-     * It is absolutely essential that we reset the owner before making the page
-     * visible. Failing to do so will lead to bad race conditions where the
-     * thread that just created a new page races with a thread that tries to
-     * evict the same page.
-     */
-    __atomic_store_n(&ref->owner, 0, __ATOMIC_RELEASE);
-    WT_REF_SET_STATE(ref, WT_REF_MEM);
-    __wt_evict_touch_page(session, ref, false, wont_need);
-}
-
 /*
  * __ref_get_state --
  *     Get a ref's state variable safely.
@@ -110,7 +94,6 @@ __ref_get_state(WT_REF *ref)
 {
     return (__wt_atomic_loadv8(&ref->__state));
 }
-
 #define WT_REF_GET_STATE(ref) __ref_get_state((ref))
 #define WT_REF_OWNER(ref) (__atomic_load_n(&ref->owner, __ATOMIC_ACQUIRE))
 
@@ -131,8 +114,8 @@ __ref_cas_state(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE old_state,
 
     /* If we have the reference locked and we are about to unlock it, reset the owner first */
     if (old_state == WT_REF_LOCKED && new_state != WT_REF_LOCKED &&
-        WT_REF_OWNER(ref) == (uint64_t)session)
-        __atomic_store_n(&ref->owner, 0, __ATOMIC_RELEASE);
+        WT_REF_OWNER(ref) == session)
+        __atomic_store_n(&ref->owner, 0,  __ATOMIC_SEQ_CST);
 
     cas_result = __wt_atomic_casv8(&ref->__state, old_state, new_state);
 
@@ -145,19 +128,7 @@ __ref_cas_state(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE old_state,
         __ref_track_state(session, ref, new_state, func, line);
 #endif
     if (cas_result && new_state == WT_REF_LOCKED)
-        __atomic_store_n(&ref->owner, (uint64_t)session, __ATOMIC_RELEASE);
-
-#if 0
-    if (cas_result) {
-        printf("session %d SUCCESS to CAS STATE from %d to %d on page %p,  func %s, line %d\n",
-               (int)session->id, old_state, new_state, (ref->page == NULL)? 0 : (void*)ref->page,
-               func, line);
-    }
-    else
-        printf("session %d FAIL to CAS STATE from %d to %d on page %p,  func %s, line %d\n", (int)session->id,
-               old_state, new_state, (ref->page == NULL)? 0 : (void*)ref->page, func, line);
-    fflush(stdout);
-#endif
+        __atomic_store_n(&ref->owner, session,  __ATOMIC_SEQ_CST);
 
     return (cas_result);
 }
@@ -191,3 +162,23 @@ __ref_lock(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE *previous_statep)
         WT_REF_SET_STATE(ref, state);                       \
     }  while(0)
 
+
+static WT_INLINE void
+__wt_ref_make_visible(WT_SESSION_IMPL *session, WT_REF *ref, bool wont_need) {
+
+    if (ref->page != NULL)
+        WT_ASSERT(session, ref->page->ref == ref);
+
+	WT_ASSERT(session, WT_REF_GET_STATE(ref) == WT_REF_LOCKED);
+	WT_ASSERT(session, session==ref->owner);
+
+	__wt_evict_touch_page(session, ref, false, wont_need);
+    /*
+     * It is absolutely essential that we properly unlock the page here
+	 * as opposed to just setting its state to memory. Unlocking resets the
+	 * page owner, whereas a simple state change does not. If we do not reset
+	 * the owner, we will get subtle race conditions.
+	 */
+	WT_REF_UNLOCK(ref, WT_REF_MEM);
+
+}

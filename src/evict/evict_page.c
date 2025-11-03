@@ -161,7 +161,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE previous_state, u
     if (!closing)
         WT_ASSERT(session,
                   (WT_REF_GET_STATE(ref) == WT_REF_LOCKED
-                   && WT_REF_OWNER(ref) == (uint64_t)session));
+                   && WT_REF_OWNER(ref) == session));
 
     __wt_verbose_debug3(
       session, WT_VERB_EVICTION, "page %p (%s)", (void *)page, __wt_page_type_string(page->type));

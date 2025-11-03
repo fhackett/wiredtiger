@@ -1185,7 +1185,7 @@ __evict_page(WT_SESSION_IMPL *session)
     WT_RET_TRACK(__evict_get_ref(session, &btree, &ref, &previous_state));
     WT_ASSERT(session,
               (WT_REF_GET_STATE(ref) == WT_REF_LOCKED
-               && WT_REF_OWNER(ref) == (uint64_t)session));
+               && WT_REF_OWNER(ref) == session));
 
     /*
      * Was the page evicted by an eviction worker on an application thread?
@@ -1713,7 +1713,7 @@ __wt_evict_remove(WT_SESSION_IMPL *session, WT_REF *ref, bool destroying)
     if (WT_EVICT_PAGE_CLEARED(page))
         return;
 
-    if (WT_REF_GET_STATE(ref) == WT_REF_LOCKED && WT_REF_OWNER(ref) == (uint64_t)session) {
+    if (WT_REF_GET_STATE(ref) == WT_REF_LOCKED && WT_REF_OWNER(ref) == session) {
         /* The ref is already locked by us */
 #if EVICT_DEBUG_PRINT
         printf("ref for page %p %s (type %d) already locked in __wt_evict_remove by session %d\n",
@@ -1778,7 +1778,7 @@ __wt_evict_enqueue_page(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_RE
      * Lock the page so it doesn't disappear. We aren't evicting the page, so we don't need to check
      * for hazard pointers.
      */
-    if (previous_state == WT_REF_LOCKED && WT_REF_OWNER(ref) == (uint64_t)session)
+    if (previous_state == WT_REF_LOCKED && WT_REF_OWNER(ref) == session)
         must_unlock_ref = false;
     else if (previous_state == WT_REF_LOCKED) {
         /*

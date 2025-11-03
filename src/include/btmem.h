@@ -1138,7 +1138,7 @@ struct __wt_ref {
      * For more details on these functions see ref_inline.h.
      */
     wt_shared volatile WT_REF_STATE __state;
-	uint64_t owner;
+	wt_shared volatile WT_SESSION_IMPL *owner;
 
     /*
      * Address: on-page cell if read from backing block, off-page WT_ADDR if instantiated in-memory,
