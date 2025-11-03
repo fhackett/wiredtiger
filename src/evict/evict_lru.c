@@ -997,6 +997,8 @@ __evict_get_ref(
 
     locked_bucket = hazard_check = locked_ref = locked_ref2 = skip_flag = skip_function = queue_empty = 0;
 
+	(void)locked_bucket;
+
     *btreep = NULL;
     bucketset = NULL;
     conn = S2C(session);
@@ -1761,6 +1763,7 @@ __wt_evict_enqueue_page(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_RE
     uint64_t dst_bucket, read_gen;
     static int times;
 
+	(void) times;
     page = ref->page;
     previous_state = WT_REF_GET_STATE(ref);
 
