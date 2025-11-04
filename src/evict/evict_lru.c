@@ -1,4 +1,3 @@
-
 /*-
  * Copyright (c) 2014-present MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
@@ -997,7 +996,7 @@ __evict_get_ref(
 
     locked_bucket = hazard_check = locked_ref = locked_ref2 = skip_flag = skip_function = queue_empty = 0;
 
-	(void)locked_bucket;
+    (void)locked_bucket;
 
     *btreep = NULL;
     bucketset = NULL;
@@ -1037,20 +1036,14 @@ __evict_get_ref(
      * In each bucketset we iterate over the buckets starting with the smallest, because smaller
      * buckets will have pages with smaller read generations.
      */
-    if (F_ISSET(evict, WT_EVICT_CACHE_CLEAN))
-        max_level = WT_EVICT_LEVEL_CLEAN_INTERNAL;
-    if (F_ISSET(evict, WT_EVICT_CACHE_DIRTY))
-        max_level = WT_EVICT_LEVEL_DIRTY_INTERNAL;
+//    if (F_ISSET(evict, WT_EVICT_CACHE_CLEAN))
+//        max_level = WT_EVICT_LEVEL_CLEAN_INTERNAL;
+//    if (F_ISSET(evict, WT_EVICT_CACHE_DIRTY))
+    (void)evict;
+    max_level = WT_EVICT_LEVEL_DIRTY_INTERNAL;
 
     for (i = 0; i <= max_level; i++) {
         bucketset = WT_DHANDLE_TO_BUCKETSET(dhandle, i);
-
-        if (bucketset->bucketset_num_items == 0) {
-            if (max_level == 4)
-                printf("Nothing at level %d\n", (int)i);
-            continue;
-        }
-
         for (j = __wt_atomic_load32(&bucketset->bucket_last_considered) % WT_EVICT_NUM_BUCKETS, iter = 0;
              iter++ < WT_EVICT_NUM_BUCKETS; j = (j+1) % WT_EVICT_NUM_BUCKETS) {
 
@@ -1060,7 +1053,6 @@ __evict_get_ref(
                 locked_bucket++;
                 continue;
             }
-
             __wt_atomic_store32(&bucketset->bucket_last_considered, j);
 
             if (TAILQ_EMPTY(&bucket->evict_queue))
@@ -1763,7 +1755,7 @@ __wt_evict_enqueue_page(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_RE
     uint64_t dst_bucket, read_gen;
     static int times;
 
-	(void) times;
+    (void) times;
     page = ref->page;
     previous_state = WT_REF_GET_STATE(ref);
 
@@ -1861,13 +1853,6 @@ __wt_evict_touch_page(WT_SESSION_IMPL *session, WT_REF *ref, bool internal_only,
             __evict_read_gen_new(session, page);
         __wt_evict_enqueue_page(session, session->dhandle, ref);
     } else if (!internal_only) {
-#if 0
-        if (page->evict_data.bucket != NULL) {
-            printf("%p. read_gen = %" PRIu64 ", bucket = %" PRIu64 ", level = %d\n", page,
-                   page->evict_data.read_gen, page->evict_data.bucket->id,
-                   __wt_evict_get_bucketset_level(session, page));
-        }
-#endif
         bumped = __wti_evict_read_gen_bump(session, page);
         if (bumped || page->evict_data.bucket == NULL)
             __wt_evict_enqueue_page(session, session->dhandle, ref);

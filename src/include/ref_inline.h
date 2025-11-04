@@ -166,19 +166,26 @@ __ref_lock(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE *previous_statep)
 static WT_INLINE void
 __wt_ref_make_visible(WT_SESSION_IMPL *session, WT_REF *ref, bool wont_need) {
 
+    WT_REF_STATE current_state, previous_state;
+
     if (ref->page != NULL)
         WT_ASSERT(session, ref->page->ref == ref);
 
-	WT_ASSERT(session, WT_REF_GET_STATE(ref) == WT_REF_LOCKED);
-	WT_ASSERT(session, session==ref->owner);
+    if ((current_state = WT_REF_GET_STATE(ref)) != WT_REF_LOCKED) {
+        WT_ASSERT(session, current_state == WT_REF_DISK || current_state == WT_REF_MEM);
+        WT_REF_LOCK(session, ref, &previous_state);
+    }
+    else
+        WT_ASSERT(session, session==ref->owner);
 
-	__wt_evict_touch_page(session, ref, false, wont_need);
+    /* Insert into eviction data structures */
+    __wt_evict_touch_page(session, ref, false, wont_need);
     /*
      * It is absolutely essential that we properly unlock the page here
-	 * as opposed to just setting its state to memory. Unlocking resets the
-	 * page owner, whereas a simple state change does not. If we do not reset
-	 * the owner, we will get subtle race conditions.
-	 */
-	WT_REF_UNLOCK(ref, WT_REF_MEM);
+     * as opposed to just setting its state to memory. Unlocking resets the
+     * page owner, whereas a simple state change does not. If we do not reset
+     * the owner, we will get subtle race conditions.
+     */
+    WT_REF_UNLOCK(ref, WT_REF_MEM);
 
 }
