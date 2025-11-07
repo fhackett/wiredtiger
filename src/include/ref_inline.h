@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <omnilink/glue/reflocking_wrapper.h>
+
 /*
  * __wt_ref_is_root --
  *     Return if the page reference is for the root page.
@@ -53,6 +55,7 @@ __wt_ref_is_root(WT_REF *ref)
 static WT_INLINE void
 __ref_set_state(WT_REF *ref, WT_REF_STATE state)
 {
+    // set state, idk owner
     WT_RELEASE_WRITE_WITH_BARRIER(ref->__state, state);
 }
 
@@ -87,8 +90,16 @@ __ref_track_state(
 
 static WT_INLINE void
 __wt_ref_make_visible(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_REF *ref) {
-	__wt_evict_touch_page(session, dhandle, ref, false, false);
+    bool was_locked;
+    __wt_evict_touch_page(session, dhandle, ref, false, false);
+    was_locked = __wt_atomic_loadv8(&ref->__state) == WT_REF_LOCKED;
+    if (was_locked) {
+        omnilink_reflocking_wrapper_unlock_start((intptr_t)session, (intptr_t)ref);
+    }
 	WT_REF_SET_STATE(ref, WT_REF_MEM);
+    if (was_locked) {
+        omnilink_reflocking_wrapper_unlock_end();
+    }
 }
 
 /*
@@ -131,6 +142,13 @@ __ref_cas_state(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE old_state,
     WT_UNUSED(func);
     WT_UNUSED(line);
 
+    if (old_state == WT_REF_LOCKED && new_state != WT_REF_LOCKED) {
+        omnilink_reflocking_wrapper_unlock_start((intptr_t)session, (intptr_t)ref);
+    }
+    if (old_state != WT_REF_LOCKED && new_state == WT_REF_LOCKED) {
+        omnilink_reflocking_wrapper_lock_start((intptr_t)session, (intptr_t)ref);
+    }
+
 	/* If we have the reference locked and we are about to unlock it, reset the owner first */
 	if (old_state == WT_REF_LOCKED && new_state != WT_REF_LOCKED &&
 		WT_REF_OWNER(ref) == (uint64_t)session)
@@ -149,15 +167,30 @@ __ref_cas_state(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE old_state,
 	if (cas_result && new_state == WT_REF_LOCKED)
 		__atomic_store_n(&ref->owner, (uint64_t)session, __ATOMIC_RELEASE);
 
-	if (cas_result) {
-		printf("session %d SUCCESS to CAS STATE from %d to %d on page %p,  func %s, line %d\n",
-			   (int)session->id, old_state, new_state, (ref->page == NULL)? 0 : (void*)ref->page,
-			   func, line);
-	}
-	else
-		printf("session %d FAIL to CAS STATE from %d to %d on page %p,  func %s, line %d\n", (int)session->id,
-			   old_state, new_state, (ref->page == NULL)? 0 : (void*)ref->page, func, line);
-	fflush(stdout);
+	// if (cas_result) {
+	// 	printf("session %d SUCCESS to CAS STATE from %d to %d on page %p,  func %s, line %d\n",
+	// 		   (int)session->id, old_state, new_state, (ref->page == NULL)? 0 : (void*)ref->page,
+	// 		   func, line);
+	// }
+	// else
+	// 	printf("session %d FAIL to CAS STATE from %d to %d on page %p,  func %s, line %d\n", (int)session->id,
+	// 		   old_state, new_state, (ref->page == NULL)? 0 : (void*)ref->page, func, line);
+	// fflush(stdout);
+    if (cas_result) {
+        if (old_state == WT_REF_LOCKED && new_state != WT_REF_LOCKED) {
+            omnilink_reflocking_wrapper_unlock_end();
+        }
+        if (old_state != WT_REF_LOCKED && new_state == WT_REF_LOCKED) {
+            omnilink_reflocking_wrapper_lock_end();
+        }
+    } else {
+        if (old_state == WT_REF_LOCKED && new_state != WT_REF_LOCKED) {
+            omnilink_reflocking_wrapper_unlock_abort();
+        }
+        if (old_state != WT_REF_LOCKED && new_state == WT_REF_LOCKED) {
+            omnilink_reflocking_wrapper_lock_abort();
+        }
+    }
     return (cas_result);
 }
 
@@ -176,8 +209,9 @@ __ref_lock(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE *previous_statep)
     for (;; __wt_yield()) {
         previous_state = WT_REF_GET_STATE_STRICT(ref);
         if (previous_state != WT_REF_LOCKED &&
-          WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED))
+          WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED)) {
             break;
+        }
     }
     *(previous_statep) = previous_state;
 }
@@ -186,7 +220,9 @@ __ref_lock(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF_STATE *previous_statep)
 
 #define WT_REF_UNLOCK(ref, state) \
 	do {											\
-		__atomic_store_n(&ref->owner, 0, __ATOMIC_SEQ_CST); \
+		omnilink_reflocking_wrapper_unlock_start((intptr_t)session, (intptr_t)ref); \
+        __atomic_store_n(&ref->owner, 0, __ATOMIC_SEQ_CST); \
 		WT_REF_SET_STATE(ref, state);						\
+        omnilink_reflocking_wrapper_unlock_end(); \
 	}  while(0)
 

@@ -459,8 +459,8 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
     __wt_spin_lock_name(session, &evict->evict_exclusive_lock, "__wt_evict_file_exclusive_on");
     if (++btree->evict_data.evict_disabled > 1) {
         __wt_spin_unlock_name(session, &evict->evict_exclusive_lock, "__wt_evict_file_exclusive_on");
-		my_printf("In exclusive_on: evict_disabled for %s is %d\n",
-			   btree->dhandle->name, btree->evict_data.evict_disabled);
+		// my_printf("In exclusive_on: evict_disabled for %s is %d\n",
+		// 	   btree->dhandle->name, btree->evict_data.evict_disabled);
         return (0);
     }
 
@@ -516,8 +516,8 @@ __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session)
 
     __wt_spin_lock_name(session, &evict->evict_exclusive_lock, "__wt_evict_file_exclusive_off");
     --btree->evict_data.evict_disabled;
-	my_printf("In exclusive_off: evict_disabled for %s is %d\n",
-		   btree->dhandle->name, btree->evict_data.evict_disabled);
+	// my_printf("In exclusive_off: evict_disabled for %s is %d\n",
+	// 	   btree->dhandle->name, btree->evict_data.evict_disabled);
 #if defined(HAVE_DIAGNOSTIC)
     WT_ASSERT(session, btree->evict_data.evict_disabled >= 0);
 #endif
@@ -995,8 +995,8 @@ __evict_get_ref(
 				ref = page->ref;
 				WT_ASSERT(session, ref != NULL);
 				if ((void*)ref == (void*)0xabababababababab) {
-					printf("DELETED REF for page %p\n", (void*)page);
-					fflush(stdout);
+					// printf("DELETED REF for page %p\n", (void*)page);
+					// fflush(stdout);
 				}
 #ifdef HAVE_DIAGNOSTIC
 				if ((previous_state = WT_REF_GET_STATE(ref)) != WT_REF_MEM
@@ -1012,17 +1012,17 @@ __evict_get_ref(
 				previous_state =  WT_REF_GET_STATE_STRICT(ref);
 				if (previous_state == WT_REF_LOCKED) {
 					WT_STAT_CONN_INCR(session, eviction_skip_pages_locked_or_evicted);
-					printf("page %p was locked or evicted. Eviction skipping... session %d\n",
-						   (void*)page, (int)session->id);
-					fflush(stdout);
+					// printf("page %p was locked or evicted. Eviction skipping... session %d\n",
+					// 	   (void*)page, (int)session->id);
+					// fflush(stdout);
                     ref = NULL;
                     continue;
 				} else if (previous_state == WT_REF_MEM) {
 					if (!WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED)) {
 						WT_STAT_CONN_INCR(session, eviction_skip_pages_locked_or_evicted);
-						printf("page %p could not be locked. Eviction skipping... session %d\n",
-							   (void*)page, (int)session->id);
-						fflush(stdout);
+						// printf("page %p could not be locked. Eviction skipping... session %d\n",
+						// 	   (void*)page, (int)session->id);
+						// fflush(stdout);
 						ref = NULL;
 						continue;
 					}
@@ -1058,7 +1058,7 @@ __evict_get_ref(
             }
 unlock_bucket_and_done:
             __wt_spin_unlock_name(session, &bucket->evict_queue_lock, "__evict_get_ref");
-			my_printf("Session %p RELEASED %p\n", (void*)session, (void*)&bucket->evict_queue_lock);
+			// my_printf("Session %p RELEASED %p\n", (void*)session, (void*)&bucket->evict_queue_lock);
             if (ref != NULL)
                 goto done;
         }
@@ -1671,59 +1671,60 @@ __wt_evict_remove(WT_SESSION_IMPL *session, WT_REF *ref, bool destroying)
 
     if (WT_REF_GET_STATE_STRICT(ref) == WT_REF_LOCKED && WT_REF_OWNER(ref) == (uint64_t)session) {
 		/* The ref is already locked by us */
-		printf("ref for page %p %s (type %d) already locked in __wt_evict_remove by session %d\n",
-			   (void*)ref->page, __wt_page_type_string(ref->page->type), ref->page->type, session->id);
-		fflush(stdout);
+		// printf("ref for page %p %s (type %d) already locked in __wt_evict_remove by session %d\n",
+		// 	   (void*)ref->page, __wt_page_type_string(ref->page->type), ref->page->type, session->id);
+		// fflush(stdout);
         must_unlock_ref = false;
     } else {
-		printf("Session %d about to LOCK ref for page %p %s (type %d) in __wt_evict_remove!\n",
-			   session->id, (void*)page, __wt_page_type_string(page->type), page->type);
-		fflush(stdout);
+		// printf("Session %d about to LOCK ref for page %p %s (type %d) in __wt_evict_remove!\n",
+		// 	   session->id, (void*)page, __wt_page_type_string(page->type), page->type);
+		// fflush(stdout);
 		WT_REF_LOCK(session, ref, &previous_state);
 		must_unlock_ref = true;
-		fflush(stdout);
+		//fflush(stdout);
 	}
 
 	if (!WT_EVICT_PAGE_CLEARED(page)) {
 		before = &page->evict_data.bucket->evict_queue_lock;
 		__wt_spin_lock_name(session, &page->evict_data.bucket->evict_queue_lock, "__wt_evict_remove");
 
-		printf("page %p TO BE REMOVED by %d from evict structs. Bucket: %p, next = %p, prev = %p\n",
-			   (void*)page, (int)session->id, (void*)page->evict_data.bucket,
-			   (void*)(page->evict_data.evict_q.tqe_next), (void*)(page->evict_data.evict_q.tqe_prev));
-		fflush(stdout);
+		// printf("page %p TO BE REMOVED by %d from evict structs. Bucket: %p, next = %p, prev = %p\n",
+		// 	   (void*)page, (int)session->id, (void*)page->evict_data.bucket,
+		// 	   (void*)(page->evict_data.evict_q.tqe_next), (void*)(page->evict_data.evict_q.tqe_prev));
+		// fflush(stdout);
 
 		TAILQ_REMOVE(&page->evict_data.bucket->evict_queue, page, evict_data.evict_q);
 		page->evict_data.bucket->num_items--;
 		WT_ASSERT(session, page->evict_data.bucket->num_items >= 0);
 
-		printf("page %p removed by %d from evict structs. Bucket: %p,  next = %p, prev = %p\n",
-			   (void*)page, (int)session->id, (void*)page->evict_data.bucket,
-			   (void*)(page->evict_data.evict_q.tqe_next), (void*)(page->evict_data.evict_q.tqe_prev));
-		fflush(stdout);
+		// printf("page %p removed by %d from evict structs. Bucket: %p,  next = %p, prev = %p\n",
+		// 	   (void*)page, (int)session->id, (void*)page->evict_data.bucket,
+		// 	   (void*)(page->evict_data.evict_q.tqe_next), (void*)(page->evict_data.evict_q.tqe_prev));
+		// fflush(stdout);
 
-#define DEBUG_QUEUE
-#ifdef DEBUG_QUEUE
-		TAILQ_FOREACH (iter_page, &page->evict_data.bucket->evict_queue, evict_data.evict_q) {
-			if (iter_page == page) {
-				while(1) {
-					printf("page %p not removed by session %d\n", (void*)page, (int)session->id);
-					fflush(stdout);
-				}
-			}
-		}
-#endif
+// #define DEBUG_QUEUE
+// #ifdef DEBUG_QUEUE
+// 		TAILQ_FOREACH (iter_page, &page->evict_data.bucket->evict_queue, evict_data.evict_q) {
+// 			if (iter_page == page) {
+// 				while(1) {
+// 					printf("page %p not removed by session %d\n", (void*)page, (int)session->id);
+// 					fflush(stdout);
+// 				}
+// 			}
+// 		}
+// #endif
 
 #define SAME_LOCK_BUG
 #ifdef SAME_LOCK_BUG
 		after = &page->evict_data.bucket->evict_queue_lock;
 		if (before != after) {
-			while(1) {
-				printf("Lock %p is NOT THE SAME as %p: page %p %s (type %d), session %d \n",
-					   (void*)before, (void*)after, (void*)page, __wt_page_type_string(page->type),
-					   page->type, session->id);
-				fflush(stdout);
-			}
+            omnilink_reflocking_wrapper_bug();
+			// while(1) {
+			// 	printf("Lock %p is NOT THE SAME as %p: page %p %s (type %d), session %d \n",
+			// 		   (void*)before, (void*)after, (void*)page, __wt_page_type_string(page->type),
+			// 		   page->type, session->id);
+			// 	fflush(stdout);
+			// }
 		}
 #endif
 		__wt_spin_unlock_name(session, &page->evict_data.bucket->evict_queue_lock, "__wt_evict_remove");
@@ -1763,8 +1764,8 @@ __evict_renumber_buckets(WT_EVICT_BUCKETSET *bucketset, uint64_t read_gen)
      * to lose this race.
      */
     __wt_atomic_casv64(&bucketset->lowest_bucket_upper_range, prev, new);
-	my_printf("Renumbered: bucketset %p new upper range is %" PRId64 "",
-						   (void*)bucketset, new);
+	// my_printf("Renumbered: bucketset %p new upper range is %" PRId64 "",
+	// 					   (void*)bucketset, new);
 }
 
 /*
@@ -1899,9 +1900,9 @@ __evict_page_consistency_check(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle
 
 	if (page->evict_data.bucket != NULL && page->evict_data.evict_q.tqe_next == NULL &&
 		page->evict_data.evict_q.tqe_prev == NULL) {
-		printf("page (%s) %p is in a bucket %p, but not in a queue",
-			   __wt_page_type_string(page->type),(void*)page, (void*)page->evict_data.bucket);
-		fflush(stdout);
+		// printf("page (%s) %p is in a bucket %p, but not in a queue",
+		// 	   __wt_page_type_string(page->type),(void*)page, (void*)page->evict_data.bucket);
+		// fflush(stdout);
 		WT_ASSERT(session, false);
 	}
 
@@ -1963,19 +1964,19 @@ __wt_evict_enqueue_page(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_RE
 	if (!WT_DHANDLE_BTREE(dhandle) || !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		return;
 
-	printf("PAGE %p STATE is %d in __wt_evict_enqueue_page, session %d\n",
-		   (void*)page, previous_state, (int)session->id);
-	fflush(stdout);
+	// printf("PAGE %p STATE is %d in __wt_evict_enqueue_page, session %d\n",
+	// 	   (void*)page, previous_state, (int)session->id);
+	// fflush(stdout);
 
 	/* Evict handle has the bucket sets for this data handle */
     evict_data = &((WT_BTREE*)dhandle->handle)->evict_data;
     WT_ASSERT(session, evict_data->initialized);
 
-	if (page->type < WT_PAGE_INVALID || page->type > WT_PAGE_ROW_LEAF) {
-		printf("Unexpected page type!!!!!!!!!!!\n");
-		fflush(stdout);
-		while(1);
-	}
+	// if (page->type < WT_PAGE_INVALID || page->type > WT_PAGE_ROW_LEAF) {
+	// 	printf("Unexpected page type!!!!!!!!!!!\n");
+	// 	fflush(stdout);
+	// 	while(1);
+	// }
 
 	WT_ASSERT(session, previous_state == WT_REF_LOCKED || previous_state == WT_REF_MEM);
     /*
@@ -1983,16 +1984,16 @@ __wt_evict_enqueue_page(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_RE
      * for hazard pointers.
      */
 	if (previous_state == WT_REF_LOCKED && WT_REF_OWNER(ref) == (uint64_t)session) {
-		printf("ref for page %p %s (type %d) already locked in __wt_evict_enqueue_page by session %d"
-			   " session=%p, owner=%p\n",
-			   (void*)page, __wt_page_type_string(page->type), page->type, session->id,
-			   (void*)session, (void*)ref->owner);
-		fflush(stdout);
+		// printf("ref for page %p %s (type %d) already locked in __wt_evict_enqueue_page by session %d"
+		// 	   " session=%p, owner=%p\n",
+		// 	   (void*)page, __wt_page_type_string(page->type), page->type, session->id,
+		// 	   (void*)session, (void*)ref->owner);
+		// fflush(stdout);
 		must_unlock_ref = false;
 	} else /* We must lock */ {
-		printf("Session %d about to LOCK ref for page %p %s (type %d) in __wt_evict_enqueue_page!\n",
-			  session->id, (void*)page, __wt_page_type_string(page->type), page->type);
-		fflush(stdout);
+		// printf("Session %d about to LOCK ref for page %p %s (type %d) in __wt_evict_enqueue_page!\n",
+		// 	  session->id, (void*)page, __wt_page_type_string(page->type), page->type);
+		// fflush(stdout);
 		WT_REF_LOCK(session, ref, &previous_state);
 		must_unlock_ref = true;
 	}
@@ -2003,8 +2004,8 @@ __wt_evict_enqueue_page(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_RE
 
 	if (is_new) {
 		WT_ASSERT(session, bucketset == NULL && bucket == NULL);
-		printf("page %p is new by session %d\n", (void*)page, (int)session->id);
-		fflush(stdout);
+		// printf("page %p is new by session %d\n", (void*)page, (int)session->id);
+		// fflush(stdout);
 		goto new;
 	}
 
@@ -2023,9 +2024,9 @@ __wt_evict_enqueue_page(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, WT_RE
 		} else /* wrong bucketset */
 			__wt_evict_remove(session, ref, false);
 	}
-	printf("page %p %s (type %d) was removed from bucket %p by session %d\n",
-		   (void*)page, __wt_page_type_string(page->type), page->type, (void*)bucket, session->id);
-	fflush(stdout);
+	// printf("page %p %s (type %d) was removed from bucket %p by session %d\n",
+	// 	   (void*)page, __wt_page_type_string(page->type), page->type, (void*)bucket, session->id);
+	// fflush(stdout);
 
   new:
 	WT_ASSERT(session, page->evict_data.bucket == NULL);
@@ -2074,29 +2075,29 @@ retry:
     bucket = &bucketset->buckets[dst_bucket];
 	page->evict_data.bucket = bucket;
 
-	my_printf("Session %p acquiring %p\n", (void*)session, (void*)&bucket->evict_queue_lock);
+	// my_printf("Session %p acquiring %p\n", (void*)session, (void*)&bucket->evict_queue_lock);
     __wt_spin_lock_name(session, &bucket->evict_queue_lock, "__wt_evict_enqueue_page");
-	my_printf("Session %p ACQUIRED %p\n", (void*)session, (void*)&bucket->evict_queue_lock);
+	// my_printf("Session %p ACQUIRED %p\n", (void*)session, (void*)&bucket->evict_queue_lock);
 	fflush(stdout);
     TAILQ_INSERT_HEAD(&page->evict_data.bucket->evict_queue, page, evict_data.evict_q);
     bucket->num_items++;
 
-	printf(
-		"page (%s) %p type %d STATE %d read_gen %" PRId64 ": enqueued by session %d in bucket %" PRId64
-		" (%p) of bucketset %d (%p) ur: %" PRId64 "\n",
-		__wt_page_type_string(page->type), (void *)page, page->type, WT_REF_GET_STATE(page->ref),
-		page->evict_data.read_gen, (int)session->id, dst_bucket, (void *)bucket, bucketset_level,
-		(void *)bucketset, bucketset->lowest_bucket_upper_range);
-	fflush(stdout);
+	// printf(
+	// 	"page (%s) %p type %d STATE %d read_gen %" PRId64 ": enqueued by session %d in bucket %" PRId64
+	// 	" (%p) of bucketset %d (%p) ur: %" PRId64 "\n",
+	// 	__wt_page_type_string(page->type), (void *)page, page->type, WT_REF_GET_STATE(page->ref),
+	// 	page->evict_data.read_gen, (int)session->id, dst_bucket, (void *)bucket, bucketset_level,
+	// 	(void *)bucketset, bucketset->lowest_bucket_upper_range);
+	// fflush(stdout);
     __wt_spin_unlock_name(session, &bucket->evict_queue_lock, "__wt_evict_enqueue_page");
-	my_printf("Session %p RELEASED %p\n", (void*)session, (void*)&bucket->evict_queue_lock);
+	// my_printf("Session %p RELEASED %p\n", (void*)session, (void*)&bucket->evict_queue_lock);
 	fflush(stdout);
 
-	if (page->type < WT_PAGE_INVALID || page->type > WT_PAGE_ROW_LEAF) {
-		printf("Unexpected page type!!!!!!!!!!!\n");
-		fflush(stdout);
-		while(1);
-	}
+	// if (page->type < WT_PAGE_INVALID || page->type > WT_PAGE_ROW_LEAF) {
+	// 	printf("Unexpected page type!!!!!!!!!!!\n");
+	// 	fflush(stdout);
+	// 	while(1);
+	// }
 
 #if defined(HAVE_DIAGNOSTIC)
 	__evict_page_consistency_check(session,  page->evict_data.dhandle, page, is_new, true);
@@ -2105,14 +2106,14 @@ retry:
 done:
 	if (must_unlock_ref) {
 		WT_REF_UNLOCK(ref, previous_state);
-		printf("page (%s) %p type %d STATE %d read_gen %" PRId64 ": unlocked by session %d\n",
-			   __wt_page_type_string(page->type), (void *)page, page->type,
-			   WT_REF_GET_STATE(page->ref), page->evict_data.read_gen, session->id);
+		// printf("page (%s) %p type %d STATE %d read_gen %" PRId64 ": unlocked by session %d\n",
+		// 	   __wt_page_type_string(page->type), (void *)page, page->type,
+		// 	   WT_REF_GET_STATE(page->ref), page->evict_data.read_gen, session->id);
 	}
-	else
-		printf("page (%s) %p type %d STATE %d read_gen %" PRId64 ": NOT unlocked by session %d\n",
-			   __wt_page_type_string(page->type), (void *)page, page->type,
-			   WT_REF_GET_STATE(page->ref), 	page->evict_data.read_gen, session->id);
+	//else
+		// printf("page (%s) %p type %d STATE %d read_gen %" PRId64 ": NOT unlocked by session %d\n",
+		// 	   __wt_page_type_string(page->type), (void *)page, page->type,
+		// 	   WT_REF_GET_STATE(page->ref), 	page->evict_data.read_gen, session->id);
 
 }
 
@@ -2367,12 +2368,12 @@ __wt_evict_page_first_dirty(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Move the page to the right bucketset */
 	if (page->ref != NULL && page->evict_data.dhandle != NULL) {
-		if ((state = WT_REF_GET_STATE(page->ref)) != WT_REF_MEM)
-			printf("in __wt_evict_page_first_dirty page NOT IN MEMORY, state %d for page %p\n",
-				   (int)state, (void*)page);
-		else
-			printf("in __wt_evict_page_first_dirty page STATE IS %d for page %p\n", (int)state, (void*)page);
-		fflush(stdout);
+		// if ((state = WT_REF_GET_STATE(page->ref)) != WT_REF_MEM)
+		// 	printf("in __wt_evict_page_first_dirty page NOT IN MEMORY, state %d for page %p\n",
+		// 		   (int)state, (void*)page);
+		// else
+		// 	printf("in __wt_evict_page_first_dirty page STATE IS %d for page %p\n", (int)state, (void*)page);
+		// fflush(stdout);
 		__wt_evict_enqueue_page(session, page->evict_data.dhandle, page->ref, false);
 	}
 }

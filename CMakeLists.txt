@@ -17,6 +17,10 @@ include(cmake/helpers.cmake)
 include(cmake/define_libwiredtiger.cmake)
 include(cmake/gdb_autoloader_setup.cmake)
 
+find_package(OmniLink REQUIRED)
+find_package(msgpack-cxx REQUIRED)
+find_package(omnilink_reflocking_wrapper REQUIRED)
+
 # If the user doesn't manually specify the target ARCH and OS (i.e not cross-compiling)
 # we will infer the target from the host. This is checked prior to the config option
 # being defined (in base.cmake) since it will prevent it having a default value.

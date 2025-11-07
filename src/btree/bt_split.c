@@ -2142,7 +2142,7 @@ __split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	 * because we will lose this reference. The page will be freed later.
 	 */
 	__wt_evict_remove(session, ref, false);
-	printf("SPLIT!!!!!!\n"); fflush(stdout);
+	// printf("SPLIT!!!!!!\n"); fflush(stdout);
 
     /*
      * Split into the parent; if we're closing the file, we hold it exclusively.

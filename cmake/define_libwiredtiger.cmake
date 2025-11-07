@@ -50,6 +50,8 @@ macro(define_wiredtiger_library target type)
         C_STANDARD 11
     )
 
+    target_link_libraries(${target} PUBLIC omnilink_reflocking_wrapper::omnilink_reflocking_wrapper)
+
     # Ensure we link any available library dependencies to our wiredtiger target.
     if(HAVE_LIBPTHREAD)
         target_link_libraries(${target} PUBLIC ${HAVE_LIBPTHREAD})

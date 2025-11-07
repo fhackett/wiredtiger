@@ -203,13 +203,13 @@ __wt_spin_lock_name(WT_SESSION_IMPL *session, WT_SPINLOCK *t, char *func)
 {
     WT_DECL_RET;
 
-	printf("Session %d to acquire mutex %p held by session %" PRIu32 " from %s\n", session->id, (void*)t,
-		   t->session_id, func);
+	// printf("Session %d to acquire mutex %p held by session %" PRIu32 " from %s\n", session->id, (void*)t,
+	// 	   t->session_id, func);
     if ((ret = pthread_mutex_lock(&t->lock)) != 0)
         WT_IGNORE_RET(__wt_panic(session, ret, "pthread_mutex_lock: %s", t->name));
     __wt_atomic_store32(&t->session_id, WT_SPIN_SESSION_ID_SAFE(session));
-	printf("Mutex %p ACQUIRED by session %" PRIu32 " from %s\n", (void*)t, WT_SPIN_SESSION_ID_SAFE(session), func);
-	fflush(stdout);
+	// printf("Mutex %p ACQUIRED by session %" PRIu32 " from %s\n", (void*)t, WT_SPIN_SESSION_ID_SAFE(session), func);
+	// fflush(stdout);
 }
 #endif
 
@@ -228,8 +228,8 @@ __wt_spin_unlock_name(WT_SESSION_IMPL *session, WT_SPINLOCK *t, char *func)
     __wt_atomic_store32(&t->session_id, WT_SESSION_ID_INVALID);
     if ((ret = pthread_mutex_unlock(&t->lock)) != 0)
         WT_IGNORE_RET(__wt_panic(session, ret, "pthread_mutex_unlock: %s", t->name));
-	printf("Mutex %p RELEASED by session %" PRIu32 " from %s\n", (void*)t, WT_SPIN_SESSION_ID_SAFE(session), func);
-	fflush(stdout);
+	// printf("Mutex %p RELEASED by session %" PRIu32 " from %s\n", (void*)t, WT_SPIN_SESSION_ID_SAFE(session), func);
+	// fflush(stdout);
 }
 
 
